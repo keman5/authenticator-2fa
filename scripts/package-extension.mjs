@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { zipSync } from 'fflate';
 
-const allTargets = ['chrome', 'edge', 'firefox'];
+const allTargets = ['chrome', 'edge', 'firefox', 'safari'];
 const targets = process.argv.slice(2);
 const selectedTargets = targets.length ? targets : allTargets;
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'));

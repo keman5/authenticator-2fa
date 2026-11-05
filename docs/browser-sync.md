@@ -5,12 +5,13 @@ Browser Sync is optional and uses the existing storage permission. It adds no ac
 ## Security and recovery
 
 - Accounts are encrypted with AES-256-GCM and a random 256-bit recovery key before upload. Account names, secrets, and counters stay encrypted; the browser provider can see data sizes and update timing.
-- The recovery key stays inside your password-protected local vault. Save it somewhere safe. A connected, unlocked device can show it again; there is no recovery service.
+- The recovery key stays inside your local vault. The optional password is an interface lock and does not encrypt local accounts or recovery credentials. Save the recovery key somewhere safe. A connected, unlocked device can show it again; there is no recovery service.
 - Devices can use different vault passwords. Changing one does not change the recovery key or revoke other devices. Backups exclude sync credentials.
 
 ## Behavior and limits
 
 - Sync works within the same browser provider and extension identity on supported devices. It does not bridge providers; platform support varies.
+- Safari is excluded because its `storage.sync` implementation stores data locally without synchronizing devices. Local account management and backups remain available.
 - Changes merge while the extension is open and unlocked. The browser handles delivery. A successful check cannot confirm another device received the changes.
 - Each device writes separate encrypted records. Concurrent edits resolve deterministically; deletions win against offline edits. Restores and credential replacements get fresh identities. Encrypted origin fingerprints recognize delayed copies without confusing different credentials. Preferences and ordering stay local.
 - When older deletion records lack origin fingerprints, joining keeps local copies rather than guessing which credentials were deleted.

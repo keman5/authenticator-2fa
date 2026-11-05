@@ -10,9 +10,10 @@ export function isPlainVaultRecord(record: StoredVault | null): record is PlainV
 
 export function createPlainVaultRecord(
   data: VaultData,
-  previous?: PlainVaultRecord | null
+  previous?: PlainVaultRecord | null,
+  screenLock = previous?.screenLock
 ): PlainVaultRecord {
-  if (data.browserSync) {
+  if (data.browserSync && !screenLock) {
     throw new Error('Browser Sync requires a password-protected vault.');
   }
   const now = new Date().toISOString();
@@ -20,6 +21,7 @@ export function createPlainVaultRecord(
     version: 1,
     format: 'plain',
     data,
+    ...(screenLock ? { screenLock: { ...screenLock } } : {}),
     createdAt: previous?.createdAt ?? now,
     updatedAt: now
   };

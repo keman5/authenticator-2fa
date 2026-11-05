@@ -24,7 +24,7 @@ export interface BrowserSyncRecord {
   restorationOrigin?: string;
 }
 
-/** Stored only inside the password-protected local vault, never in storage.sync. */
+/** Stored only inside the local vault, never in storage.sync. */
 export interface BrowserSyncState {
   recoveryKey: string;
   deviceId: string;

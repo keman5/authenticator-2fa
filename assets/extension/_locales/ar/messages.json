@@ -6,12 +6,15 @@
     "message": "المصادِق"
   },
   "extensionDescription": {
-    "message": "رموز 2FA مشفرة لتسجيل الدخول الآمن."
+    "message": "رموز 2FA مع استيراد QR وحماية اختيارية بكلمة مرور."
   },
   "actionTitle": {
     "message": "فتح المصادِق - 2FA"
   },
   "commandOpenPopup": {
     "message": "فتح النافذة المنبثقة"
+  },
+  "commandOpenWithoutPassword": {
+    "message": "فتح دون كلمة مرور"
   }
 }

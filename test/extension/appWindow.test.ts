@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  consumeShortcutBypass,
   getPageWindowId,
   needsFilePickerWindow,
   openAppWindow,
@@ -38,6 +39,20 @@ afterEach(() => {
 test('readAppRoute ignores missing and unrecognized routes', () => {
   expect(readAppRoute(PAGE_URL)).toBeNull();
   expect(readAppRoute(`${PAGE_URL}?open=settings`)).toBeNull();
+});
+
+test('shortcut bypass is consumed once and never applies to ordinary icon opens', () => {
+  const page = installWindow(`${PAGE_URL}?skip-screen-lock=1&window=7`);
+  const replaceState = vi.fn((_state: unknown, _title: string, url: string) => {
+    page.location.href = url;
+  });
+  Object.assign(page, { history: { state: null, replaceState } });
+  expect(consumeShortcutBypass()).toBe(true);
+  expect(page.location.href).toBe(`${PAGE_URL}?window=7`);
+  expect(consumeShortcutBypass()).toBe(false);
+  expect(replaceState).toHaveBeenCalledOnce();
+  installWindow();
+  expect(consumeShortcutBypass()).toBe(false);
 });
 
 describe('needsFilePickerWindow', () => {

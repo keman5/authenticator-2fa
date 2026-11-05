@@ -6,12 +6,15 @@
     "message": "2FA Auth"
   },
   "extensionDescription": {
-    "message": "Codes 2FA chiffrés pour des connexions sécurisées."
+    "message": "Codes 2FA avec import QR et protection facultative par mot de passe."
   },
   "actionTitle": {
     "message": "Ouvrir Authentificateur - 2FA"
   },
   "commandOpenPopup": {
     "message": "Ouvrir la fenêtre popup"
+  },
+  "commandOpenWithoutPassword": {
+    "message": "Ouvrir sans mot de passe"
   }
 }

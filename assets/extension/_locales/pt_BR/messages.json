@@ -6,12 +6,15 @@
     "message": "Autenticador"
   },
   "extensionDescription": {
-    "message": "Códigos 2FA criptografados para entradas seguras."
+    "message": "Códigos 2FA com importação QR e proteção por senha opcional."
   },
   "actionTitle": {
     "message": "Abrir Autenticador - 2FA"
   },
   "commandOpenPopup": {
     "message": "Abrir popup"
+  },
+  "commandOpenWithoutPassword": {
+    "message": "Abrir sem senha"
   }
 }

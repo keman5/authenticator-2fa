@@ -14,6 +14,27 @@ const OTHER_PASSWORD = 'another device private password';
 const SECRET = 'JBSWY3DPEHPK3PXP';
 
 describe('Browser Sync vault integration', () => {
+  test('screen lock keeps sync encrypted in transit and restores sync state after shortcut opening', async () => {
+    const network = createBrowserSyncNetwork();
+    const device = network.createDevice();
+    const vault = await createProtectedVault(device, ['Alice']);
+    await vault.startBrowserSync(generateSyncRecoveryKey(), false);
+    await vault.changeScreenPassword(PASSWORD, '1');
+    expect(vault.error).toBe('');
+    expect(vault.syncEnabled).toBe(true);
+    await vault.setShortcutBypass(true);
+    await vault.syncNow();
+    expect(vault.syncStatus).toBe('ready');
+    const reopened = new AuthenticatorVault();
+    await reopened.initialize();
+    expect(reopened.locked).toBe(true);
+    await reopened.openWithoutScreenPassword();
+    expect(labels(reopened)).toEqual(['Alice']);
+    expect(reopened.syncEnabled).toBe(true);
+    await reopened.syncNow();
+    expect(reopened.syncStatus).toBe('ready');
+  });
+
   test('joins two protected devices, preserves both account lists and keeps preferences local', async () => {
     const network = createBrowserSyncNetwork();
     const firstDevice = network.createDevice();

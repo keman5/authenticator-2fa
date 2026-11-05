@@ -25,6 +25,7 @@ import {
   type UnlockedVault
 } from '../auth/vaultCrypto';
 import { createPlainVaultRecord, isEncryptedVaultRecord, isPlainVaultRecord } from '../auth/vaultRecords';
+import { createScreenLock, verifyScreenLock } from '../auth/screenLock';
 import { importEncryptedBackup } from '../auth/backup';
 import { importAnyText } from '../auth/importText';
 import {
@@ -67,13 +68,15 @@ export class AuthenticatorVault {
   private nextSyncAttempt = 0;
 
   syncEnabled = $derived(Boolean(this.browserSync));
+  shortcutBypassEnabled = $state(false);
 
   get syncAvailable(): boolean { return browserSyncAvailable(); }
+  get hasScreenLock(): boolean { return Boolean(this.plainVault?.screenLock); }
   get syncRecoveryKey(): string { return this.browserSync?.recoveryKey ?? ''; }
 
   private key: CryptoKey | null = null;
   private encryptedVault: VaultEnvelope | null = null;
-  private plainVault: PlainVaultRecord | null = null;
+  private plainVault = $state.raw<PlainVaultRecord | null>(null);
   private mutationQueue: Promise<void> = Promise.resolve();
   private codeRefreshRequest = 0;
 
@@ -106,6 +109,22 @@ export class AuthenticatorVault {
   }
 
   private async unlockNow(password: string): Promise<void> {
+    if (this.plainVault?.screenLock) {
+      this.busy = true;
+      this.clearStatus();
+      try {
+        if (await verifyScreenLock(this.plainVault.screenLock, password)) {
+          this.locked = false;
+          this.applyUnlockedData(this.plainVault.data);
+          await this.refreshCodes();
+        } else {
+          this.error = 'Unlock failed. Check the password and try again.';
+        }
+      } finally {
+        this.busy = false;
+      }
+      return;
+    }
     if (!this.encryptedVault) {
       await this.initializeNow();
     }
@@ -236,6 +255,55 @@ export class AuthenticatorVault {
     await this.enqueueMutation(() => this.changePasswordNow(currentPassword, newPassword));
   }
 
+  async changeScreenPassword(currentPassword: string, newPassword: string): Promise<void> {
+    await this.enqueueMutation(async () => {
+      this.clearStatus();
+      this.busy = true;
+      try {
+        if (this.locked) throw new Error('Unlock the vault before making changes.');
+        if (this.encryptedVault) await unlockVaultEnvelope(this.encryptedVault, currentPassword);
+        if (this.plainVault?.screenLock && !await verifyScreenLock(this.plainVault.screenLock, currentPassword)) {
+          throw new Error('Current password is incorrect.');
+        }
+        const screenLock = await createScreenLock(newPassword, this.shortcutBypassEnabled);
+        const data = this.getCurrentData();
+        const record = createPlainVaultRecord(data, this.plainVault, screenLock);
+        await this.saveLocalVault(record);
+        this.plainVault = record;
+        this.encryptedVault = null;
+        this.key = null;
+        this.hasVault = true;
+        this.passwordProtected = true;
+        this.locked = false;
+        await clearVaultSessionKey();
+        this.showNotice('Vault password set.');
+      } catch (error) {
+        this.error = getErrorMessage(error);
+      } finally {
+        this.busy = false;
+      }
+    });
+  }
+
+  async setShortcutBypass(enabled: boolean): Promise<void> {
+    await this.enqueueMutation(async () => {
+      if (this.locked || !this.plainVault?.screenLock) throw new Error('Set a screen lock password first.');
+      const record = { ...this.plainVault, screenLock: { ...this.plainVault.screenLock, allowShortcut: enabled } };
+      await this.saveLocalVault(record);
+      this.plainVault = record;
+      this.shortcutBypassEnabled = enabled;
+    });
+  }
+
+  async openWithoutScreenPassword(): Promise<void> {
+    await this.enqueueMutation(async () => {
+      if (this.plainVault?.screenLock?.allowShortcut !== true) return;
+      this.locked = false;
+      this.applyUnlockedData(this.plainVault.data);
+      await this.refreshCodes();
+    });
+  }
+
   private async changePasswordNow(currentPassword: string, newPassword: string): Promise<void> {
     this.busy = true;
     this.clearStatus();
@@ -283,6 +351,28 @@ export class AuthenticatorVault {
     }
     if (!this.passwordProtected) {
       this.showNotice('Password protection is already off.');
+      return;
+    }
+    if (this.plainVault?.screenLock) {
+      this.busy = true;
+      this.clearStatus();
+      try {
+        if (!await verifyScreenLock(this.plainVault.screenLock, currentPassword)) {
+          throw new Error('Current password is incorrect.');
+        }
+        const record = { ...this.plainVault };
+        delete record.screenLock;
+        await this.saveLocalVault(record);
+        this.plainVault = record;
+        this.passwordProtected = false;
+        this.shortcutBypassEnabled = false;
+        this.locked = false;
+        this.applyUnlockedData(record.data);
+      } catch (error) {
+        this.error = getErrorMessage(error);
+      } finally {
+        this.busy = false;
+      }
       return;
     }
     if (!this.encryptedVault) {
@@ -386,6 +476,8 @@ export class AuthenticatorVault {
   }
 
   private applyVaultSnapshot(stored: StoredVault | null, unlocked: UnlockedVault | null = null): void {
+    const screenUnlocked = !this.locked && Boolean(this.plainVault?.screenLock) &&
+      isPlainVaultRecord(stored) && stored.screenLock?.hash === this.plainVault?.screenLock?.hash;
     const sameEncryptedVault = isEncryptedVaultRecord(stored) && this.encryptedVault &&
       getVaultKeyFingerprint(stored) === getVaultKeyFingerprint(this.encryptedVault);
     this.storedSnapshot = JSON.stringify(stored);
@@ -399,10 +491,11 @@ export class AuthenticatorVault {
     this.codes = {};
     if (!sameEncryptedVault) this.settings = createDefaultAppSettings();
     this.hasVault = Boolean(this.encryptedVault || this.plainVault);
-    this.passwordProtected = Boolean(this.encryptedVault);
-    this.locked = this.passwordProtected && !unlocked;
+    this.passwordProtected = Boolean(this.encryptedVault || this.plainVault?.screenLock);
+    this.shortcutBypassEnabled = this.plainVault?.screenLock?.allowShortcut === true;
+    this.locked = this.passwordProtected && !unlocked && !screenUnlocked;
     const data = unlocked?.data ?? this.plainVault?.data;
-    if (data) this.applyUnlockedData(data);
+    if (data && !this.locked) this.applyUnlockedData(data);
   }
 
   private enqueueMutation<T>(operation: () => Promise<T>): Promise<T> {
@@ -509,9 +602,10 @@ export class AuthenticatorVault {
   }
 
   private async persistData(data: VaultData, message?: string, browserSync = this.browserSync): Promise<void> {
+    if (this.locked) throw new Error('Unlock the vault before making changes.');
     const normalizedData = normalizeVaultData({ ...data, browserSync });
 
-    if (this.passwordProtected) {
+    if (this.encryptedVault) {
       if (!this.key || !this.encryptedVault) {
         throw new Error('Unlock the vault before making changes.');
       }

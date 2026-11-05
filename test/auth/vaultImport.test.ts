@@ -23,6 +23,20 @@ describe('importTextIntoStoredVault', () => {
     installMemoryStorage();
   });
 
+  test('background imports preserve the screen password and shortcut preference', async () => {
+    const vault = new AuthenticatorVault();
+    await vault.initialize();
+    await vault.changeScreenPassword('', '1');
+    await vault.setShortcutBypass(true);
+    await importTextIntoStoredVault(ALICE_URI);
+    const reopened = new AuthenticatorVault();
+    await reopened.initialize();
+    expect(reopened.locked).toBe(true);
+    await reopened.openWithoutScreenPassword();
+    expect(reopened.accounts).toHaveLength(1);
+    expect(reopened.shortcutBypassEnabled).toBe(true);
+  });
+
   test('imports into an empty plain vault', async () => {
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,

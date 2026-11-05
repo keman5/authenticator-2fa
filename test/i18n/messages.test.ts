@@ -8,7 +8,8 @@ const LOCALE_MESSAGES = [
   'extensionShortName',
   'extensionDescription',
   'actionTitle',
-  'commandOpenPopup'
+  'commandOpenPopup',
+  'commandOpenWithoutPassword'
 ] as const;
 const MANIFEST_LOCALE_BY_LANGUAGE: Record<string, string> = {
   en: 'en',

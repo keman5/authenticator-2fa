@@ -1,5 +1,6 @@
 import { DEFAULT_LANGUAGE, detectBrowserLanguage, resolveSupportedLanguage } from '../i18n/languages';
 import type { BrowserSyncState } from './browserSync';
+import type { ScreenLock } from './screenLock';
 
 export type OtpType = 'totp' | 'hotp' | 'steam';
 
@@ -53,7 +54,7 @@ export interface ImportResult {
 export interface VaultData {
   accounts: AuthenticatorAccount[];
   settings: AppSettings;
-  // This includes the recovery key and must only be stored inside an encrypted vault.
+  // Includes the recovery key; screen-lock mode stores this locally without encryption.
   browserSync?: BrowserSyncState;
 }
 
@@ -88,6 +89,7 @@ export interface PlainVaultRecord {
   version: 1;
   format: 'plain';
   data: VaultData;
+  screenLock?: ScreenLock;
   createdAt: string;
   updatedAt: string;
 }

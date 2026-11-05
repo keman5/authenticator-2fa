@@ -430,6 +430,113 @@ describe('AuthenticatorVault persistence and locking', () => {
     expect(reopened.settings.accountSortMode).toBe('contextual');
   });
 
+  test('accepts a one-character password and rejects an empty password without losing accounts', async () => {
+    const vault = new AuthenticatorVault();
+    await vault.initialize();
+    await vault.importText(OTPAUTH_URI);
+    await vault.changePassword('', '');
+    expect(vault.error).toBe('Vault password must be at least 1 character.');
+    expect(vault.passwordProtected).toBe(false);
+    expect(vault.accounts).toHaveLength(1);
+
+    await vault.changePassword('', 'a');
+    expect(vault.error).toBe('');
+    await vault.lock();
+    await vault.unlock('b');
+    expect(vault.locked).toBe(true);
+    await vault.unlock('a');
+    expect(vault.locked).toBe(false);
+    expect(vault.accounts).toHaveLength(1);
+    await vault.removePassword('a');
+    expect(vault.passwordProtected).toBe(false);
+    expect(vault.accounts).toHaveLength(1);
+  });
+
+  test('screen lock prompts on normal reopen and only bypasses after explicit opt-in across restarts', async () => {
+    const { sessionStorage } = installMemoryStorage();
+    installStructuredCloneChromeStorage();
+    const vault = new AuthenticatorVault();
+    await vault.initialize();
+    await vault.importText(OTPAUTH_URI);
+    await vault.changeScreenPassword('', '');
+    expect(vault.error).toBe('Vault password must be at least 1 character.');
+    expect(vault.passwordProtected).toBe(false);
+    await vault.changeScreenPassword('', '1');
+    expect(vault.error).toBe('');
+    const stored = await loadStoredVault();
+    expect(isPlainVaultRecord(stored)).toBe(true);
+    if (!isPlainVaultRecord(stored)) throw new Error('Expected plain vault');
+    expect(stored.data.accounts).toHaveLength(1);
+    expect(stored.screenLock?.hash).not.toBe('1');
+
+    const normal = new AuthenticatorVault();
+    await normal.initialize();
+    expect(normal.locked).toBe(true);
+    expect(normal.accounts).toEqual([]);
+    await expect(normal.setShortcutBypass(true)).rejects.toThrow('Set a screen lock password first.');
+    await normal.openWithoutScreenPassword();
+    expect(normal.locked).toBe(true);
+    await normal.unlock('wrong');
+    expect(normal.locked).toBe(true);
+    await normal.unlock('1');
+    expect(normal.locked).toBe(false);
+    await normal.setShortcutBypass(true);
+    sessionStorage.clear();
+    const restarted = new AuthenticatorVault();
+    await restarted.initialize();
+    expect(restarted.locked).toBe(true);
+    await restarted.openWithoutScreenPassword();
+    expect(restarted.locked).toBe(false);
+    expect(restarted.accounts).toHaveLength(1);
+    expect(Object.values(restarted.codes)).toHaveLength(1);
+    const iconOpened = new AuthenticatorVault();
+    await iconOpened.initialize();
+    expect(iconOpened.locked).toBe(true);
+    expect(iconOpened.accounts).toEqual([]);
+    await restarted.updateSettings({ theme: 'dark' });
+    await restarted.lock();
+    expect(restarted.accounts).toEqual([]);
+    await restarted.openWithoutScreenPassword();
+    expect(restarted.settings.theme).toBe('dark');
+    await restarted.setShortcutBypass(false);
+    await restarted.lock();
+    await restarted.openWithoutScreenPassword();
+    expect(restarted.locked).toBe(true);
+  });
+
+  test('screen password migration, change and removal preserve accounts and validate the current password', async () => {
+    const vault = new AuthenticatorVault();
+    await vault.initialize();
+    await vault.importText(OTPAUTH_URI);
+    await vault.changePassword('', PASSWORD);
+    await vault.changeScreenPassword('wrong', '1');
+    expect(vault.error).not.toBe('');
+    expect(isEncryptedVaultRecord(await loadStoredVault())).toBe(true);
+    await vault.changeScreenPassword(PASSWORD, '1');
+    expect(vault.error).toBe('');
+    expect(isPlainVaultRecord(await loadStoredVault())).toBe(true);
+    await vault.setShortcutBypass(true);
+    await vault.changeScreenPassword('wrong', '2');
+    expect(vault.error).toBe('Current password is incorrect.');
+    await vault.changeScreenPassword('1', '2');
+    expect(vault.error).toBe('');
+    expect(vault.shortcutBypassEnabled).toBe(true);
+    await vault.lock();
+    await vault.unlock('1');
+    expect(vault.locked).toBe(true);
+    await vault.unlock('2');
+    expect(vault.accounts).toHaveLength(1);
+    await vault.removePassword('wrong');
+    expect(vault.passwordProtected).toBe(true);
+    await vault.removePassword('2');
+    expect(vault.error).toBe('');
+    expect(vault.passwordProtected).toBe(false);
+    const reopened = new AuthenticatorVault();
+    await reopened.initialize();
+    expect(reopened.locked).toBe(false);
+    expect(reopened.accounts).toHaveLength(1);
+  });
+
   test('failed password setup does not switch live state to password protected', async () => {
     const { localStorage } = installMemoryStorage();
     const vault = new AuthenticatorVault();

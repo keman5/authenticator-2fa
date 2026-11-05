@@ -46,7 +46,7 @@
   } from './lib/auth/accountRanking';
   import { decodeQrFiles, renderQrDataUrl } from './lib/auth/qr';
   import type { AccountDraft, AuthenticatorAccount, ImportResult } from './lib/auth/types';
-  import { getPageWindowId, readAppRoute } from './lib/extension/appWindow';
+  import { consumeShortcutBypass, getPageWindowId, readAppRoute } from './lib/extension/appWindow';
   import { authenticatorVault as vault } from './lib/state/authenticator.svelte';
   import { tr } from './lib/i18n/messages';
 
@@ -262,9 +262,13 @@
   });
 
   async function initializeApp() {
+    const shortcutBypass = consumeShortcutBypass();
     try {
       browserWindowId = await getPageWindowId();
       await vault.initialize();
+      if (shortcutBypass && !document.hidden) {
+        await vault.openWithoutScreenPassword();
+      }
       await refreshPageContext();
     } finally {
       pageContextReady = true;
@@ -272,10 +276,16 @@
     openPendingRoute();
   }
 
+  function lockHiddenPanel() {
+    if (document.hidden && vault.hasScreenLock) {
+      void vault.lock().catch((error: unknown) => { vault.error = getErrorMessage(error, 'Unable to lock the vault.'); });
+    }
+  }
+
   async function createVault(password: string) {
     pageContextReady = false;
     try {
-      await vault.create(password);
+      await vault.changeScreenPassword('', password);
       await refreshPageContext();
     } finally {
       pageContextReady = true;
@@ -287,6 +297,9 @@
     pageContextReady = false;
     try {
       await vault.unlock(password);
+      if (!vault.locked && !vault.error && !vault.hasScreenLock) {
+        await vault.changeScreenPassword(password, password);
+      }
       await refreshPageContext();
     } finally {
       pageContextReady = true;
@@ -991,6 +1004,7 @@
 </svelte:head>
 
 <svelte:window ondragover={blockFileNavigation} ondrop={blockFileNavigation} />
+<svelte:document onvisibilitychange={lockHiddenPanel} />
 
 {#snippet accountRows(accounts: AuthenticatorAccount[])}
   {#each accounts as account (account.id)}

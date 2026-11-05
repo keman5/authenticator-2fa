@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const appDir = 'dist/app';
-const targets = ['chrome', 'edge', 'firefox'];
+const targets = ['chrome', 'edge', 'firefox', 'safari'];
 const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
 
 for (const target of targets) {
@@ -11,6 +11,9 @@ for (const target of targets) {
   await mkdir(outDir, { recursive: true });
   await cp(appDir, outDir, { recursive: true });
   await writeFile(join(outDir, 'manifest.json'), `${JSON.stringify(createManifest(target), null, 2)}\n`);
+  if (target === 'safari') {
+    await writeFile(join(outDir, 'background.html'), '<!doctype html><script type="module" src="assets/background.js"></script>\n');
+  }
 }
 
 function createManifest(target) {
@@ -42,6 +45,10 @@ function createManifest(target) {
       type: 'module',
     },
     commands: {
+      'open-without-password': {
+        suggested_key: { default: 'Ctrl+Shift+8', mac: 'Command+Shift+8' },
+        description: '__MSG_commandOpenWithoutPassword__',
+      },
       _execute_action: {
         suggested_key: {
           default: 'Ctrl+Shift+2',
@@ -78,6 +85,10 @@ function createManifest(target) {
       scripts: ['assets/background.js'],
       type: 'module',
     };
+  }
+
+  if (target === 'safari') {
+    manifest.background = { page: 'background.html' };
   }
 
   return manifest;

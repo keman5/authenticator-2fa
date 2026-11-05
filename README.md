@@ -2,7 +2,7 @@
 
 Browser extension for generating and managing two-factor authentication codes.
 
-**Privacy:** Authenticator - 2FA does not track users or collect analytics. Accounts stay on your device by default. If you enable Browser Sync, encrypted account data is sent through your browser provider's sync service. Account names and secrets are encrypted before upload; the recovery key stays inside your password-protected local vault.
+**Privacy:** Authenticator - 2FA does not track users or collect analytics. Accounts stay on your device by default. The optional password is an interface lock; local accounts and sync recovery credentials are stored without encryption. If you enable Browser Sync, account names and secrets are encrypted before upload through your browser provider's sync service.
 
 ![Authenticator - 2FA promo](assets/store/promotional/marquee-promo-tile.png)
 
@@ -50,7 +50,13 @@ pnpm run build
 pnpm run package
 ```
 
-`pnpm run package` builds extension zips for `chrome`, `edge`, and `firefox` into `artifacts/`.
+`./build.sh` builds extension resources for Chrome, Edge, Firefox, and Safari into `dist/<browser>/`. Other Chromium browsers can use the Chrome build. `pnpm run package` packages these resources into `artifacts/`; the Safari zip is source resources, not an installable Safari app.
+
+On macOS with Xcode installed, `./build.sh safari` also generates an Xcode project and builds an unsigned macOS Safari container in `dist/safari-native/Build/Products/Release/`. This development build requires Safari's **Allow Unsigned Extensions** setting; distribution requires Apple signing and packaging. The minimum macOS deployment target is 13.3. No installed extension or browser setting is changed by the script.
+
+The default password-bypass shortcut is **Command+Shift+8** on macOS and **Ctrl+Shift+8** elsewhere. It only bypasses the interface lock when explicitly enabled in settings. Clicking the toolbar icon still asks for the password. Chrome and Edge open their shortcut settings from the extension; Firefox opens its add-on manager, where **Manage Extension Shortcuts** is available. Safari displays the registered shortcut and uses its own extension settings; older Safari versions only support the manifest default. Existing installations may retain their previous shortcut assignment, and conflicting shortcuts may need reassignment.
+
+Safari supports local accounts, imports, exports, and the interface lock, but Browser Sync is disabled: its `storage.sync` API stores locally and does not synchronize across devices. See [platform support](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync).
 
 ## Store Assets
 

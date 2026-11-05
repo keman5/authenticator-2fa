@@ -62,7 +62,7 @@ jobs:
           node - <<'NODE'
           const { readFileSync } = require('node:fs');
 
-          for (const target of ['chrome', 'edge', 'firefox']) {
+          for (const target of ['chrome', 'edge', 'firefox', 'safari']) {
             const manifest = JSON.parse(readFileSync(`dist/${target}/manifest.json`, 'utf8'));
             if (manifest.version !== process.env.VERSION) {
               throw new Error(`${target} manifest version ${manifest.version} does not match ${process.env.VERSION}`);

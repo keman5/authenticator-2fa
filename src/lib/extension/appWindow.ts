@@ -9,6 +9,17 @@ const PAGE_WINDOW_PARAM = 'window';
 const APP_WINDOW_SIZE = { width: 440, height: 680 } as const;
 const OPEN_WINDOW_FAILED = 'Could not open a new window.';
 
+/** Consume the shortcut request so reopening or reloading this page asks again. */
+export function consumeShortcutBypass(): boolean {
+  const url = new URL(window.location.href);
+  const bypass = url.searchParams.get('skip-screen-lock') === '1';
+  if (url.searchParams.has('skip-screen-lock')) {
+    url.searchParams.delete('skip-screen-lock');
+    window.history.replaceState(window.history.state, '', url.href);
+  }
+  return bypass;
+}
+
 /** User-Agent Client Hints, which only Chromium-based browsers provide. */
 interface UserAgentData {
   brands: { brand: string }[];

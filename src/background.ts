@@ -6,6 +6,14 @@ import { installBrowserSyncCleanup } from './lib/auth/browserSyncCleanup';
 
 installBrowserSyncCleanup();
 
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== 'open-without-password') return;
+  chrome.windows.create({
+    url: chrome.runtime.getURL('index.html?skip-screen-lock=1'),
+    type: 'popup', width: 440, height: 680
+  }, () => { void chrome.runtime.lastError; });
+});
+
 interface MessageResponse {
   ok: boolean;
   error?: string;

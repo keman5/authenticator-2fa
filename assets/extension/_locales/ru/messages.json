@@ -6,12 +6,15 @@
     "message": "2FA Auth"
   },
   "extensionDescription": {
-    "message": "Зашифрованные 2FA-коды для безопасного входа."
+    "message": "Коды 2FA с импортом QR и необязательной защитой паролем."
   },
   "actionTitle": {
     "message": "Открыть Аутентификатор - 2FA"
   },
   "commandOpenPopup": {
     "message": "Открыть всплывающее окно"
+  },
+  "commandOpenWithoutPassword": {
+    "message": "Открыть без пароля"
   }
 }

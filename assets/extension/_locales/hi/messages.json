@@ -6,12 +6,15 @@
     "message": "प्रमाणक"
   },
   "extensionDescription": {
-    "message": "सुरक्षित साइन-इन के लिए एन्क्रिप्टेड 2FA कोड।"
+    "message": "QR आयात और वैकल्पिक पासवर्ड सुरक्षा वाले 2FA कोड।"
   },
   "actionTitle": {
     "message": "प्रमाणक - 2FA खोलें"
   },
   "commandOpenPopup": {
     "message": "पॉपअप खोलें"
+  },
+  "commandOpenWithoutPassword": {
+    "message": "बिना पासवर्ड खोलें"
   }
 }

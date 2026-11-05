@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { fade } from 'svelte/transition';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Cloud from '@lucide/svelte/icons/cloud';
@@ -19,6 +19,7 @@
   import { authenticatorVault as vault } from '../../state/authenticator.svelte';
   import { LANGUAGES, tr } from '../../i18n/messages';
   import type { AppSettings, ThemePreference } from '../../auth/types';
+  import { getShortcutSettingsUrl } from '../../extension/browserSupport';
 
   interface Props {
     /** Subscreen shown when settings first open. */
@@ -47,8 +48,18 @@
   let sortSaving = $state(false);
   let securitySaving = $state(false);
   let intent = $state<Intent>('idle');
-  let currentPasswordInput = $state<HTMLInputElement | undefined>();
-  let newPasswordInput = $state<HTMLInputElement | undefined>();
+  let shortcut = $state('');
+  const shortcutSettingsUrl = typeof chrome === 'undefined' ? null :
+    getShortcutSettingsUrl(chrome.runtime.getURL(''), navigator.userAgent);
+
+  onMount(() => {
+    if (typeof chrome === 'undefined' || !chrome.commands?.getAll) return;
+    chrome.commands.getAll((commands) => {
+      if (!chrome.runtime.lastError) {
+        shortcut = commands.find((command) => command.name === 'open-without-password')?.shortcut ?? '';
+      }
+    });
+  });
   // The switch reflects the desired state, even mid-change before it is applied.
   const wantsProtection = $derived(
     vault.passwordProtected ? intent !== 'disabling' : intent === 'enabling'
@@ -59,7 +70,7 @@
   );
   const canApply = $derived(
     !securityPending &&
-      newPassword.length >= 8 &&
+      newPassword.length >= 1 &&
       newPassword === confirmNewPassword &&
       (intent !== 'changing' || Boolean(currentPassword))
   );
@@ -77,13 +88,21 @@
     return vault.passwordProtected ? 'change' : null;
   });
 
-  $effect(() => {
-    if (securityPanel === 'disable' || (securityPanel === 'password' && intent === 'changing')) {
-      currentPasswordInput?.focus();
-    } else if (securityPanel === 'password') {
-      newPasswordInput?.focus();
+  function configureShortcut() {
+    if (shortcutSettingsUrl) void chrome.tabs.create({ url: shortcutSettingsUrl });
+  }
+
+  async function setShortcutBypass(input: HTMLInputElement) {
+    securitySaving = true;
+    try {
+      await vault.setShortcutBypass(input.checked);
+    } catch (error: unknown) {
+      vault.error = error instanceof Error ? error.message : tr('settingsSaveFailed');
+    } finally {
+      input.checked = vault.shortcutBypassEnabled;
+      securitySaving = false;
     }
-  });
+  }
 
   function setLanguage(language: string) {
     saveSettings({ language });
@@ -158,7 +177,7 @@
     vault.error = '';
     securitySaving = true;
     try {
-      await vault.changePassword(intent === 'changing' ? currentPassword : '', newPassword);
+      await vault.changeScreenPassword(intent === 'changing' ? currentPassword : '', newPassword);
       if (!vault.error) {
         const reopenSync = returnToSync;
         cancel();
@@ -384,6 +403,24 @@
         />
       </label>
 
+      <p class="text-xs text-base-content/60">{tr('screenLockHint')}</p>
+      <label class="flex items-center justify-between gap-3">
+        <span class="min-w-0 text-sm font-medium">
+          {tr('shortcutBypass')}
+          {#if shortcut}<kbd class="kbd kbd-sm mt-1 block w-fit">{shortcut}</kbd>{/if}
+        </span>
+        <input class="toggle toggle-primary shrink-0" type="checkbox"
+          checked={vault.shortcutBypassEnabled} disabled={securityPending || !vault.hasScreenLock}
+          onchange={(event) => void setShortcutBypass(event.currentTarget)} />
+      </label>
+      {#if shortcutSettingsUrl}
+        <button class="btn btn-sm btn-block" type="button" onclick={configureShortcut}>
+          {tr('configureShortcut')}
+        </button>
+      {:else}
+        <p class="text-xs text-base-content/60">{tr('shortcutSettingsHint')}</p>
+      {/if}
+
       {#if securityPanel}
         <div transition:panelReveal>
           {#if securityPanel === 'password'}
@@ -394,7 +431,6 @@
                   <input
                     class="input input-sm w-full"
                     type="password"
-                    bind:this={currentPasswordInput}
                     bind:value={currentPassword}
                     autocomplete="current-password"
                     disabled={securityPending}
@@ -406,7 +442,6 @@
                 <input
                   class="input input-sm w-full"
                   type="password"
-                  bind:this={newPasswordInput}
                   bind:value={newPassword}
                   autocomplete="new-password"
                   disabled={securityPending}
@@ -437,7 +472,6 @@
                 <input
                   class="input input-sm w-full"
                   type="password"
-                  bind:this={currentPasswordInput}
                   bind:value={currentPassword}
                   autocomplete="current-password"
                   disabled={securityPending}

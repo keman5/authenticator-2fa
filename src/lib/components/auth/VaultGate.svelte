@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import KeyRound from '@lucide/svelte/icons/key-round';
   import LockKeyhole from '@lucide/svelte/icons/lock-keyhole';
@@ -17,11 +16,6 @@
   let password = $state('');
   let confirmation = $state('');
   let localError = $state('');
-  let passwordInput = $state<HTMLInputElement | undefined>();
-
-  onMount(() => {
-    passwordInput?.focus();
-  });
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -51,7 +45,7 @@
         {/if}
       </div>
       <div class="grid gap-1">
-        <h1 class="text-xl font-bold tracking-tight">{hasVault ? tr('unlockTitle') : tr('setupTitle')}</h1>
+        <h1 class="text-xl font-bold tracking-tight">{hasVault ? tr('unlockTitle') : tr('setPassword')}</h1>
         <p class="text-sm leading-snug text-base-content/60">{tr('tagline')}</p>
       </div>
     </div>
@@ -62,7 +56,6 @@
         <input
           class="input w-full"
           type="password"
-          bind:this={passwordInput}
           bind:value={password}
           autocomplete="current-password"
           required

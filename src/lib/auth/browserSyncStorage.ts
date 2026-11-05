@@ -1,3 +1,5 @@
+import { isSafariExtension } from '../extension/browserSupport';
+
 export type BrowserSyncErrorCode = 'unavailable' | 'passwordRequired' | 'invalidKey' | 'notFound' | 'quota' | 'invalidData' | 'storage';
 
 export class BrowserSyncError extends Error {
@@ -7,7 +9,8 @@ export class BrowserSyncError extends Error {
 }
 
 export function browserSyncAvailable(): boolean {
-  return typeof chrome !== 'undefined' && Boolean(chrome.storage?.sync);
+  // Safari exposes storage.sync but keeps it local, so it cannot connect devices.
+  return typeof chrome !== 'undefined' && Boolean(chrome.storage?.sync) && !isSafariExtension();
 }
 
 export async function readBrowserSyncItems(): Promise<Record<string, unknown>> {

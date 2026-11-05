@@ -19,7 +19,7 @@
 
   type ExportFormat = 'encrypted' | 'plain';
 
-  const MIN_PASSWORD_LENGTH = 8;
+  const MIN_PASSWORD_LENGTH = 1;
   const FORMATS = [
     { id: 'encrypted', icon: ShieldCheck, title: 'exportOptionEncrypted', hint: 'exportOptionEncryptedHint' },
     { id: 'plain', icon: FileText, title: 'exportOptionPlain', hint: 'plainWarning' }
