@@ -1,20 +1,20 @@
 {
-  "extensionName": {
-    "message": "Authentifikator - 2FA"
+  "name": {
+    "message": "Authenticator - 2FA"
   },
-  "extensionShortName": {
-    "message": "2FA Auth"
+  "shortName": {
+    "message": "2FA Codes"
   },
-  "extensionDescription": {
-    "message": "2FA-Codes mit QR-Import und optionalem Passwortschutz."
+  "description": {
+    "message": "Einmalcodes, optionale Bildschirmsperre und verschlüsselte Backups."
   },
-  "actionTitle": {
-    "message": "Authentifikator - 2FA öffnen"
+  "title": {
+    "message": "Authenticator - 2FA"
   },
-  "commandOpenPopup": {
-    "message": "Popup öffnen"
+  "normal": {
+    "message": "Mit Sperre öffnen"
   },
-  "commandOpenWithoutPassword": {
-    "message": "Ohne Passwort öffnen"
+  "direct": {
+    "message": "Direkt öffnen"
   }
 }

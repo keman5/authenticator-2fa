@@ -1,1398 +1,655 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
-  import { prefersReducedMotion } from 'svelte/motion';
-  import { fade } from 'svelte/transition';
-  import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
-  import ChevronDown from '@lucide/svelte/icons/chevron-down';
-  import Download from '@lucide/svelte/icons/download';
-  import ExternalLink from '@lucide/svelte/icons/external-link';
-  import ImageUp from '@lucide/svelte/icons/image-up';
-  import KeyRound from '@lucide/svelte/icons/key-round';
-  import Pencil from '@lucide/svelte/icons/pencil';
-  import Plus from '@lucide/svelte/icons/plus';
-  import QrCode from '@lucide/svelte/icons/qr-code';
-  import ScanLine from '@lucide/svelte/icons/scan-line';
-  import Search from '@lucide/svelte/icons/search';
-  import Trash from '@lucide/svelte/icons/trash';
-  import Upload from '@lucide/svelte/icons/upload';
-  import X from '@lucide/svelte/icons/x';
-  import AccountForm from './lib/components/auth/AccountForm.svelte';
-  import AccountRow from './lib/components/auth/AccountRow.svelte';
-  import AppBar from './lib/components/auth/AppBar.svelte';
-  import FilePickerButton from './lib/components/auth/FilePickerButton.svelte';
-  import MotionDialog from './lib/components/auth/MotionDialog.svelte';
-  import SettingsView from './lib/components/auth/SettingsView.svelte';
-  import Toast from './lib/components/auth/Toast.svelte';
-  import VaultGate from './lib/components/auth/VaultGate.svelte';
+  import { cacheIsOpen, panelExpired } from "./domain/locking";
   import {
-    FADE_TRANSITION,
-    PANEL_TRANSITION,
-    panelReveal,
-    viewTransition
-  } from './lib/components/auth/transitions';
+    touchID,
+    touchIDWindow,
+    TouchIDError,
+    isMac,
+  } from "./platform/touchID";
+  import { onMount } from "svelte";
   import {
-    getAutoScrollVelocity as calculateAutoScrollVelocity,
-    isReorderCurrent,
-    moveItem,
-    rubberbandOffset
-  } from './lib/components/auth/reorder';
-  import { getImportFailureMessage } from './lib/components/auth/importFeedback';
-  import { AccountChangedError, getErrorMessage } from './lib/auth/errors';
-  import { accountToOtpAuthUri } from './lib/auth/otpauth';
+    activeRecords,
+    emptyWorkspace,
+    identify,
+    InputError,
+    insertRecords,
+    matchesSite,
+    moveRecord,
+    nextChange,
+    reviseRecord,
+    type Credential,
+    type Workspace,
+  } from "./domain/records";
+  import { codeFor } from "./domain/otp";
+  import { checkGate } from "./domain/sealing";
   import {
-    getAccountListView,
-    getAccountPageRanking,
-    type PageContext
-  } from './lib/auth/accountRanking';
-  import { decodeQrFiles, renderQrDataUrl } from './lib/auth/qr';
-  import type { AccountDraft, AuthenticatorAccount, ImportResult } from './lib/auth/types';
-  import { consumeShortcutBypass, getPageWindowId, readAppRoute } from './lib/extension/appWindow';
-  import { authenticatorVault as vault } from './lib/state/authenticator.svelte';
-  import { tr } from './lib/i18n/messages';
-
-  type View = 'codes' | 'settings';
-  type AddMode = 'qr' | 'manual' | 'paste';
-  type PageScanState = 'idle' | 'starting' | 'waiting';
-
-  interface RuntimeResponse {
-    ok?: boolean;
-    error?: string;
-    pasted?: boolean;
-    pageContext?: PageContext | null;
-  }
-
-  interface PageScanCompletedMessage {
-    type: 'page-scan:completed';
-    ok: boolean;
-    message: string;
-  }
-
-  interface ActivePageContextChangedMessage {
-    type: 'active-page-context-changed';
-    windowId: number;
-    clearCurrent: boolean;
-  }
-
-  interface AccountDragRect {
-    id: string;
-    top: number;
-    height: number;
-  }
-
-  interface AccountDragState {
-    accountId: string;
-    pointerId: number;
-    startPointerY: number;
-    currentPointerY: number;
-    pointerOffsetY: number;
-    startIndex: number;
-    currentIndex: number;
-    itemHeight: number;
-    scrollTopAtStart: number;
-    itemRects: AccountDragRect[];
-  }
-
-  const ADD_MODES: { mode: AddMode; key: 'addQr' | 'addManual' | 'addPaste'; icon: typeof ScanLine }[] = [
-    { mode: 'qr', key: 'addQr', icon: ScanLine },
-    { mode: 'manual', key: 'addManual', icon: KeyRound },
-    { mode: 'paste', key: 'addPaste', icon: ClipboardPaste }
-  ];
-  let view = $state<View>('codes');
-  let animateViewTransition = $state(false);
-  let query = $state('');
-  let dragAccounts = $state.raw<AuthenticatorAccount[] | null>(null);
-  let dragState = $state.raw<AccountDragState | null>(null);
-  let reorderSaving = $state(false);
-  let keyboardDraggingAccountId = $state<string | null>(null);
-  let reorderSourceIds: string[] | null = null;
-  let accountListElement = $state<HTMLUListElement | null>(null);
-  let scrollContainerElement = $state<HTMLDivElement | null>(null);
-  let activeDragHandle: HTMLElement | null = null;
-  let autoScrollFrame = 0;
-  let lastAutoScrollTime = 0;
-  let previousBodyUserSelect: string | null = null;
-  let showAdd = $state(false);
-  let addMode = $state<AddMode>('qr');
-  let addImportText = $state('');
-  let editing = $state<AuthenticatorAccount | null>(null);
-  let deleting = $state<AuthenticatorAccount | null>(null);
-  let actionsFor = $state<AuthenticatorAccount | null>(null);
-  let qrAccount = $state<AuthenticatorAccount | null>(null);
-  let qrDataUrl = $state('');
-  let qrRenderRequest = 0;
-  let formError = $state('');
-  let addBusy = $state(false);
-  let addStatus = $state('');
-  let addError = $state('');
-  let pageScanState = $state<PageScanState>('idle');
-  let pageScanMessage = $state('');
-  let pageScanError = $state('');
-  let pageContext = $state.raw<PageContext | null>(null);
-  let pageContextReady = $state(false);
-  let allCodesRevealed = $state(false);
-  let pageContextRequest = 0;
-  let browserWindowId: number | undefined;
-  // Set when the popup handed this window a task it could not finish itself.
-  let pendingRoute = readAppRoute(window.location.href);
-  let settingsPanel = $state<'transfer'>();
-
-  const manualSort = $derived(vault.settings.accountSortMode === 'manual');
-  const pageRanking = $derived.by(() =>
-    getAccountPageRanking(vault.sortedAccounts, manualSort ? null : pageContext)
+    readWorkspace,
+    subscribeWorkspace,
+    transaction,
+  } from "./platform/repository";
+  import { synchronize } from "./platform/sync";
+  import { request, sourceWindow, takeQuickEntry } from "./platform/browser";
+  import { translate, type MessageKey } from "./lib/i18n/messages";
+  import CredentialEditor from "./ui/CredentialEditor.svelte";
+  import TransferView from "./ui/TransferView.svelte";
+  import PreferencesView from "./ui/PreferencesView.svelte";
+  let space = $state.raw(emptyWorkspace());
+  let ready = $state(false),
+    locked = $state(true),
+    password = $state(""),
+    error = $state(""),
+    notice = $state("");
+  let view = $state("codes"),
+    search = $state(""),
+    editing = $state<Credential | null | undefined>(undefined),
+    remove = $state<Credential>(),
+    qr = $state<{ image: string; name: string }>();
+  let codes = $state<Record<string, string>>({}),
+    now = $state(Date.now()),
+    hostname = $state(""),
+    busy = $state(false);
+  let generation = 0;
+  let lockEpoch = 0;
+  let bypassed = false;
+  let bypassOpenedAt: number | undefined;
+  let syncing = false;
+  const t = (key: MessageKey) => translate(space.preferences.locale, key);
+  const records = $derived(activeRecords(space));
+  const visible = $derived(
+    records
+      .filter((item) =>
+        `${item.provider} ${item.login}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      )
+      .sort((a, b) =>
+        space.preferences.matchSite
+          ? Number(matchesSite(b, hostname)) - Number(matchesSite(a, hostname))
+          : 0,
+      ),
   );
-  const orderedAccounts = $derived.by(() => dragAccounts ?? pageRanking.accounts);
-  const accountListView = $derived(
-    getAccountListView(orderedAccounts, pageRanking.suggestedAccountIds, {
-      query,
-      alwaysShowAll: vault.settings.alwaysShowAllCodes,
-      revealAll: allCodesRevealed
-    })
-  );
-  const filteredAccounts = $derived(accountListView.accounts);
-  const codesRevealed = $derived(accountListView.contextualAction === 'showMatches');
-  const reorderDisabled = $derived(
-    !manualSort || query.trim().length > 0 || filteredAccounts.length < 2
-  );
-  const activeDragAccountId = $derived(dragState?.accountId ?? keyboardDraggingAccountId);
-  const pageScanBusy = $derived(pageScanState !== 'idle');
-  const themeOverride = $derived(vault.settings.theme === 'system' ? undefined : vault.settings.theme);
-
-  function showSettings(event: MouseEvent) {
-    cleanupAccountDrag();
-    animateViewTransition = event.detail > 0;
-    settingsPanel = undefined;
-    view = 'settings';
-  }
-
-  function showCodes(event?: MouseEvent) {
-    animateViewTransition = Boolean(event && event.detail > 0);
-    view = 'codes';
-  }
-
-  onMount(() => {
-    const stopWatchingStorage = vault.watchStorage();
-    void initializeApp();
-    const timer = window.setInterval(() => void vault.refreshCodes(), 1000);
-
-    const listener = (message: unknown) => {
-      if (isPageScanCompleted(message)) {
-        void handlePageScanCompleted(message);
-      } else if (
-        isActivePageContextChanged(message) &&
-        !manualSort &&
-        (browserWindowId === undefined || message.windowId === browserWindowId)
-      ) {
-        void refreshPageContext(message.clearCurrent);
-      }
-    };
-    if (hasRuntimeMessaging()) {
-      chrome.runtime.onMessage.addListener(listener);
-    }
-
-    return () => {
-      window.clearInterval(timer);
-      stopWatchingStorage();
-      if (hasRuntimeMessaging()) {
-        chrome.runtime.onMessage.removeListener(listener);
-      }
-    };
-  });
-  onDestroy(() => {
-    cleanupAccountDrag();
-  });
-
-  $effect.pre(() => {
-    if (vault.locked || !vault.hasVault) {
-      untrack(() => {
-        if (!vault.hasVault) view = 'codes';
-        cleanupAccountDrag();
-        editing = null;
-        deleting = null;
-        actionsFor = null;
-        showAdd = false;
-        addImportText = '';
-        query = '';
-        allCodesRevealed = false;
-        clearAddFeedback();
-        closeQr();
-      });
-    }
-  });
-
-  $effect.pre(() => {
-    const accounts = vault.sortedAccounts;
-    const disabled = reorderDisabled;
-    untrack(() => {
-      if (reorderSourceIds && (disabled || !isReorderCurrent(accounts, reorderSourceIds))) {
-        cleanupAccountDrag();
-      }
-    });
-  });
-
-  // Keep the browser popup frame on the same theme as the app surface.
-  $effect(() => {
-    for (const element of [document.documentElement, document.body]) {
-      if (themeOverride) {
-        element.dataset.theme = themeOverride;
-      } else {
-        delete element.dataset.theme;
-      }
-    }
-  });
-
-  // Auto-dismiss transient status messages so they never pile up on screen.
-  $effect(() => {
-    const noticeKey = vault.noticeKey;
-    if (!vault.notice) {
-      return;
-    }
-    const id = setTimeout(() => {
-      if (vault.noticeKey === noticeKey) {
-        vault.clearNotice();
-      }
-    }, 1700);
-    return () => clearTimeout(id);
-  });
-  $effect(() => {
-    if (!vault.error || vault.locked) {
-      return;
-    }
-    const id = setTimeout(() => (vault.error = ''), 3000);
-    return () => clearTimeout(id);
-  });
-
-  async function initializeApp() {
-    const shortcutBypass = consumeShortcutBypass();
-    try {
-      browserWindowId = await getPageWindowId();
-      await vault.initialize();
-      if (shortcutBypass && !document.hidden) {
-        await vault.openWithoutScreenPassword();
-      }
-      await refreshPageContext();
-    } finally {
-      pageContextReady = true;
-    }
-    openPendingRoute();
-  }
-
-  function lockHiddenPanel() {
-    if (document.hidden && vault.hasScreenLock) {
-      void vault.lock().catch((error: unknown) => { vault.error = getErrorMessage(error, 'Unable to lock the vault.'); });
-    }
-  }
-
-  async function createVault(password: string) {
-    pageContextReady = false;
-    try {
-      await vault.changeScreenPassword('', password);
-      await refreshPageContext();
-    } finally {
-      pageContextReady = true;
-    }
-    openPendingRoute();
-  }
-
-  async function unlockVault(password: string) {
-    pageContextReady = false;
-    try {
-      await vault.unlock(password);
-      if (!vault.locked && !vault.error && !vault.hasScreenLock) {
-        await vault.changeScreenPassword(password, password);
-      }
-      await refreshPageContext();
-    } finally {
-      pageContextReady = true;
-    }
-    openPendingRoute();
-  }
-
-  /** Opens the screen this window was created for, once the vault is usable. */
-  function openPendingRoute() {
-    const route = pendingRoute;
-    if (!route || vault.locked) {
-      return;
-    }
-
-    pendingRoute = null;
-    if (route === 'add-qr') {
-      openAddDialog('qr');
-    } else {
-      settingsPanel = 'transfer';
-      view = 'settings';
-    }
-  }
-
-  async function setContextualSorting(enabled: boolean) {
-    const accountSortMode = enabled ? 'contextual' : 'manual';
-    if (vault.settings.accountSortMode === accountSortMode) {
-      return;
-    }
-
-    cleanupAccountDrag();
-    try {
-      await vault.updateSettings({ accountSortMode });
-      await refreshPageContext();
-    } catch (error) {
-      vault.error = getErrorMessage(error, tr('settingsSaveFailed'));
-    }
-  }
-
-  // Revealing every code is a per-visit choice, so this never rewrites
-  // settings. Preferring the full list hides this control altogether.
-  function toggleContextualAccountView() {
-    allCodesRevealed = !allCodesRevealed;
-  }
-
-  async function refreshPageContext(clearCurrent = true) {
-    const request = ++pageContextRequest;
-    if (clearCurrent) {
-      pageContext = null;
-      allCodesRevealed = false;
-    }
-    if (vault.settings.accountSortMode === 'manual' || !hasRuntimeMessaging()) {
-      pageContext = null;
-      return;
-    }
-
-    try {
-      const response = await sendRuntimeMessage({
-        type: 'get-active-page-context',
-        windowId: browserWindowId
-      });
-      if (request === pageContextRequest) {
-        const nextContext = parsePageContext(response.pageContext);
-        if (nextContext?.hostname !== pageContext?.hostname) {
-          allCodesRevealed = false;
-        }
-        pageContext = nextContext;
-      }
-    } catch {
-      // Context is optional. Manual order is the quiet fallback when the
-      // browser cannot expose active-tab metadata.
-    }
-  }
-
-  function openAddDialog(mode: AddMode = 'qr') {
-    addMode = mode;
-    showAdd = true;
-    addImportText = '';
-    clearAddFeedback();
-  }
-
-  function selectAddMode(mode: AddMode) {
-    addMode = mode;
-    clearAddFeedback();
-  }
-
-  function clearAddFeedback() {
-    formError = '';
-    addStatus = '';
-    addError = '';
-    pageScanMessage = '';
-    pageScanError = '';
-  }
-
-  async function saveNewAccount(draft: AccountDraft) {
-    await runForm(async () => {
-      await vault.addAccount(draft);
-      showAdd = false;
-    });
-  }
-
-  async function saveEditedAccount(draft: AccountDraft) {
-    const account = editing;
-    if (!account) {
-      return;
-    }
-    await runForm(async () => {
-      await vault.updateAccount(account, draft);
-      editing = null;
-    });
-  }
-
-  async function runForm(action: () => Promise<void>) {
-    formError = '';
-    try {
-      await action();
-    } catch (error) {
-      formError = error instanceof AccountChangedError
-        ? tr('accountChanged') : getErrorMessage(error, 'Unable to save account.');
-    }
-  }
-
-  async function copyCode(value: string) {
-    vault.error = '';
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch (error) {
-      vault.error = getErrorMessage(error, tr('copyFailed'));
-      return;
-    }
-
-    if (!vault.settings.autoPasteCodes) {
-      vault.showNotice(tr('copied'));
-      return;
-    }
-
-    try {
-      const response = await sendRuntimeMessage({
-        type: 'paste-code',
-        code: value,
-        windowId: browserWindowId
-      });
-      vault.showNotice(response.pasted ? tr('copiedAndPasted') : tr('copied'));
-    } catch {
-      vault.showNotice(tr('copied'));
-    }
-  }
-
-  async function showQr(account: AuthenticatorAccount) {
-    const request = qrRenderRequest + 1;
-    qrRenderRequest = request;
-    qrAccount = account;
-    qrDataUrl = '';
-    const dataUrl = await renderQrDataUrl(accountToOtpAuthUri(account));
-    if (!vault.locked && vault.hasVault && qrRenderRequest === request && qrAccount?.id === account.id) {
-      qrDataUrl = dataUrl;
-    }
-  }
-
-  function closeQr() {
-    qrRenderRequest += 1;
-    qrAccount = null;
-    qrDataUrl = '';
-  }
-
-  function importQrImages(files: File[]) {
-    void runAddImport(async () => {
-      const decoded = await decodeQrFiles(files);
-      return vault.importText(decoded.join('\n'));
-    });
-  }
-
-  async function importAddText() {
-    await runAddImport(
-      async () => vault.importText(addImportText),
-      () => (addImportText = '')
+  function explain(err: unknown) {
+    return t(
+      err instanceof TouchIDError
+        ? `error_touchID_${err.code}`
+        : err instanceof InputError
+          ? `error_${err.code}`
+          : "error_generic",
     );
   }
-
-  async function runAddImport(action: () => Promise<ImportResult>, afterSuccess?: () => void) {
-    addBusy = true;
-    addError = '';
-    pageScanError = '';
-    addStatus = tr('importing');
+  function accept(latest: Workspace) {
+    if (latest.gate?.proof !== space.gate?.proof) {
+      lock();
+      locked = Boolean(latest.gate);
+    } else if (latest.gate) {
+      if (
+        space.gate?.unlockedAt !== undefined &&
+        latest.gate.unlockedAt === undefined
+      )
+        lock();
+      if (!document.hidden && !bypassed && cacheIsOpen(latest.gate))
+        locked = false;
+      else if (
+        !locked &&
+        !bypassed &&
+        panelExpired(latest.gate, latest.gate.unlockedAt)
+      )
+        lock();
+    }
+    space = latest;
+  }
+  async function change(work: (space: Workspace) => void | Promise<void>) {
+    const result = await transaction(work);
+    accept(result.workspace);
+  }
+  async function attempt(work: () => Promise<void>) {
+    error = "";
     try {
-      const result = await action();
-      if (result.imported === 0) {
-        addStatus = '';
-        addError = getImportFailureMessage(result);
+      await work();
+    } catch (err) {
+      error = explain(err);
+    }
+  }
+  function lock() {
+    if (space.gate) locked = true;
+    password = "";
+    editing = undefined;
+    remove = undefined;
+    qr = undefined;
+    codes = {};
+    generation++;
+    lockEpoch++;
+    bypassed = false;
+    bypassOpenedAt = undefined;
+  }
+  async function completeUnlock(
+    proof: string,
+    epoch: number,
+    biometric = false,
+  ) {
+    if (epoch !== lockEpoch || document.hidden) return;
+    const result = await transaction((s) => {
+      if (!s.gate || s.gate.proof !== proof || (biometric && !s.gate.touchID))
+        throw new InputError("stale");
+      if (epoch !== lockEpoch || document.hidden) throw new InputError("stale");
+      s.gate.unlockedAt = Date.now();
+    });
+    if (epoch !== lockEpoch || document.hidden) return;
+    space = result.workspace;
+    locked = false;
+    bypassed = false;
+    password = "";
+  }
+  async function lockNow() {
+    lock();
+    await attempt(() =>
+      change((s) => {
+        if (s.gate) delete s.gate.unlockedAt;
+      }),
+    );
+  }
+  async function unlock() {
+    busy = true;
+    await attempt(async () => {
+      const epoch = lockEpoch;
+      const latest = await readWorkspace();
+      space = latest;
+      if (!latest.gate) {
+        locked = false;
         return;
       }
-
-      addStatus = '';
-      afterSuccess?.();
-      showAdd = false;
-      view = 'codes';
-    } catch (error) {
-      addStatus = '';
-      addError = getErrorMessage(error, tr('importFailed'));
-    } finally {
-      addBusy = false;
-    }
+      if (!(await checkGate(latest.gate, password)))
+        throw new InputError("password");
+      await completeUnlock(latest.gate.proof, epoch);
+    });
+    busy = false;
   }
-
-  async function startPageScan() {
-    showAdd = true;
-    addMode = 'qr';
-    pageScanMessage = '';
-    pageScanError = '';
-    addError = '';
-    vault.error = '';
-
-    if (!hasRuntimeMessaging()) {
-      pageScanError = tr('scanPageUnavailable');
-      return;
-    }
-
-    pageScanState = 'starting';
-    try {
-      await sendRuntimeMessage({ type: 'start-page-scan', windowId: browserWindowId });
-      pageScanState = 'waiting';
-      pageScanMessage = '';
-      showAdd = false;
-      view = 'codes';
-      closeExtensionWindow();
-    } catch (error) {
-      pageScanState = 'idle';
-      pageScanError = getErrorMessage(error, tr('scanPageFailed'));
-    }
+  async function unlockTouchID() {
+    busy = true;
+    await attempt(async () => {
+      if (await touchIDWindow()) return;
+      const stamp = lockEpoch;
+      const proof = space.gate?.proof;
+      if (!space.gate?.touchID) throw new TouchIDError("unavailable");
+      await touchID("authenticate", t("touchIDReason"));
+      const latest = await readWorkspace();
+      if (!latest.gate?.touchID || latest.gate.proof !== proof)
+        throw new InputError("stale");
+      await completeUnlock(proof!, stamp, true);
+    });
+    busy = false;
   }
-
-  function closeExtensionWindow(): void {
-    if (!/^(chrome|moz)-extension:$/.test(window.location.protocol)) {
-      return;
-    }
-
-    setTimeout(() => {
-      window.close();
-    }, 0);
-  }
-
-  function hasRuntimeMessaging(): boolean {
-    return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.onMessage);
-  }
-
-  function sendRuntimeMessage(message: unknown): Promise<RuntimeResponse> {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response: RuntimeResponse | undefined) => {
-        const errorMessage = chrome.runtime.lastError?.message;
-        if (errorMessage) {
-          reject(new Error(errorMessage));
-        } else if (response?.ok === false) {
-          reject(new Error(response.error ?? tr('scanPageFailed')));
-        } else {
-          resolve(response ?? { ok: true });
-        }
+  async function save(item: Credential) {
+    if (editing) await change((s) => reviseRecord(s, editing!, item));
+    else {
+      const identified = await identify(item);
+      await change((s) => {
+        insertRecords(s, [identified]);
       });
-    });
-  }
-
-  function isPageScanCompleted(message: unknown): message is PageScanCompletedMessage {
-    return (
-      typeof message === 'object' &&
-      message !== null &&
-      (message as { type?: unknown }).type === 'page-scan:completed' &&
-      typeof (message as { ok?: unknown }).ok === 'boolean' &&
-      typeof (message as { message?: unknown }).message === 'string'
-    );
-  }
-
-  function isActivePageContextChanged(
-    message: unknown
-  ): message is ActivePageContextChangedMessage {
-    return (
-      typeof message === 'object' &&
-      message !== null &&
-      (message as { type?: unknown }).type === 'active-page-context-changed' &&
-      Number.isSafeInteger((message as { windowId?: unknown }).windowId) &&
-      typeof (message as { clearCurrent?: unknown }).clearCurrent === 'boolean'
-    );
-  }
-
-  function parsePageContext(value: unknown): PageContext | null {
-    if (!value || typeof value !== 'object') {
-      return null;
     }
-
-    const context = value as { hostname?: unknown; title?: unknown };
-    if (
-      typeof context.hostname !== 'string' ||
-      context.hostname.length === 0 ||
-      context.hostname.length > 253
-    ) {
-      return null;
-    }
-    return {
-      hostname: context.hostname,
-      ...(typeof context.title === 'string' ? { title: context.title.slice(0, 512) } : {})
-    };
+    editing = undefined;
   }
-
-  async function handlePageScanCompleted(message: PageScanCompletedMessage) {
-    pageScanState = 'idle';
-    pageScanMessage = '';
-    if (!message.ok) {
-      const failure = message.message || tr('scanPageFailed');
-      // Surface the error in exactly one place: inside the add modal when it
-      // is open, otherwise as the global toast. Setting both would render the
-      // same message twice (in the modal and faded behind it).
-      if (showAdd) {
-        pageScanError = failure;
-        vault.error = '';
+  async function importItems(items: Credential[]) {
+    const result = await transaction((s) => insertRecords(s, items));
+    accept(result.workspace);
+    return `${t("imported")}: ${result.result.added} · ${t("skipped")}: ${result.result.skipped}`;
+  }
+  async function copy(item: Credential) {
+    await attempt(async () => {
+      let code: string;
+      if (item.mode === "hotp") {
+        const result = await transaction(async (s) => {
+          const current = s.records[item.id];
+          if (!current || current.removed || current.changed !== item.changed)
+            throw new InputError("stale");
+          if (current.counter === Number.MAX_SAFE_INTEGER)
+            throw new InputError("invalid");
+          const value = await codeFor(current, Date.now());
+          await navigator.clipboard.writeText(value);
+          s.records[item.id] = {
+            ...current,
+            counter: current.counter + 1,
+            changed: nextChange(current.changed),
+          };
+          return value;
+        });
+        accept(result.workspace);
+        code = result.result;
       } else {
-        pageScanError = '';
-        vault.error = failure;
+        const latest = await readWorkspace();
+        const current = latest.records[item.id];
+        if (!current || current.removed || current.changed !== item.changed)
+          throw new InputError("stale");
+        code = await codeFor(current, Date.now());
+        await navigator.clipboard.writeText(code);
       }
-      return;
-    }
-
-    pageScanError = '';
-    showAdd = false;
-    view = 'codes';
-    await vault.initialize();
-    await refreshPageContext();
-  }
-
-  async function deleteSelected() {
-    const account = deleting;
-    if (!account) {
-      return;
-    }
-    await runForm(async () => {
-      await vault.deleteAccount(account);
-      deleting = null;
-    });
-  }
-
-  function startAccountDrag(account: AuthenticatorAccount, event: PointerEvent) {
-    const scrollContainer = scrollContainerElement;
-    if (
-      dragState ||
-      keyboardDraggingAccountId ||
-      reorderSaving ||
-      reorderDisabled ||
-      !accountListElement ||
-      !scrollContainer
-    ) {
-      return;
-    }
-
-    if (event.pointerType === 'mouse' && event.button !== 0) {
-      return;
-    }
-
-    const rows = getAccountRows();
-    const startIndex = rows.findIndex((row) => row.dataset.accountId === account.id);
-    const row = rows[startIndex];
-    if (!row) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    keyboardDraggingAccountId = null;
-    dragAccounts = null;
-
-    const rowRect = row.getBoundingClientRect();
-    const scrollRect = scrollContainer.getBoundingClientRect();
-    const itemRects = rows.map((item) => {
-      const rect = item.getBoundingClientRect();
-      return {
-        id: item.dataset.accountId ?? '',
-        top: rect.top - scrollRect.top + scrollContainer.scrollTop,
-        height: rect.height
-      };
-    });
-    reorderSourceIds = itemRects.map((item) => item.id);
-
-    activeDragHandle = event.currentTarget as HTMLElement;
-    activeDragHandle.setPointerCapture?.(event.pointerId);
-    previousBodyUserSelect = document.body.style.userSelect;
-    document.body.style.userSelect = 'none';
-    dragState = {
-      accountId: account.id,
-      pointerId: event.pointerId,
-      startPointerY: event.clientY,
-      currentPointerY: event.clientY,
-      pointerOffsetY: event.clientY - rowRect.top,
-      startIndex,
-      currentIndex: startIndex,
-      itemHeight: rowRect.height,
-      scrollTopAtStart: scrollContainer.scrollTop,
-      itemRects
-    };
-
-    window.addEventListener('pointermove', handleAccountDragMove, { passive: false });
-    window.addEventListener('pointerup', finishAccountDrag, { passive: false });
-    window.addEventListener('pointercancel', cancelAccountDrag);
-    startAutoScroll();
-  }
-
-  function handleAccountDragMove(event: PointerEvent) {
-    if (!dragState || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    event.preventDefault();
-    updatePointerDrag(event.clientY);
-  }
-
-  function updatePointerDrag(clientY: number) {
-    if (!dragState) {
-      return;
-    }
-
-    const toIndex = getPointerAccountIndex(clientY, dragState);
-    dragState = {
-      ...dragState,
-      currentPointerY: clientY,
-      currentIndex: toIndex === -1 ? dragState.currentIndex : toIndex
-    };
-  }
-
-  function finishAccountDrag(event: PointerEvent) {
-    if (!dragState || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-
-    event.preventDefault();
-    updatePointerDrag(event.clientY);
-    const state = dragState;
-    const accounts =
-      state.currentIndex === state.startIndex
-        ? null
-        : moveItem(vault.sortedAccounts, state.startIndex, state.currentIndex);
-    if (accounts) {
-      void commitAccountOrder(accounts);
-    } else {
-      cleanupAccountDrag();
-    }
-  }
-
-  function cancelAccountDrag(event: PointerEvent) {
-    if (!dragState || event.pointerId !== dragState.pointerId) {
-      return;
-    }
-    cleanupAccountDrag();
-  }
-
-  function cleanupAccountDrag() {
-    cleanupPointerDrag();
-    keyboardDraggingAccountId = null;
-    dragAccounts = null;
-    reorderSourceIds = null;
-  }
-
-  function cleanupPointerDrag() {
-    const pointerId = dragState?.pointerId;
-    window.removeEventListener('pointermove', handleAccountDragMove);
-    window.removeEventListener('pointerup', finishAccountDrag);
-    window.removeEventListener('pointercancel', cancelAccountDrag);
-    if (autoScrollFrame) {
-      window.cancelAnimationFrame(autoScrollFrame);
-      autoScrollFrame = 0;
-    }
-    lastAutoScrollTime = 0;
-    if (
-      activeDragHandle &&
-      pointerId !== undefined &&
-      activeDragHandle.hasPointerCapture?.(pointerId)
-    ) {
-      activeDragHandle.releasePointerCapture(pointerId);
-    }
-    if (typeof document !== 'undefined' && previousBodyUserSelect !== null) {
-      document.body.style.userSelect = previousBodyUserSelect;
-    }
-    previousBodyUserSelect = null;
-    activeDragHandle = null;
-    dragState = null;
-  }
-
-  function startAutoScroll() {
-    if (autoScrollFrame) {
-      window.cancelAnimationFrame(autoScrollFrame);
-    }
-    autoScrollFrame = window.requestAnimationFrame(runAutoScroll);
-  }
-
-  function runAutoScroll(timestamp: number) {
-    if (!dragState || !scrollContainerElement) {
-      autoScrollFrame = 0;
-      lastAutoScrollTime = 0;
-      return;
-    }
-
-    const elapsed = lastAutoScrollTime ? Math.min(timestamp - lastAutoScrollTime, 32) : 1000 / 60;
-    lastAutoScrollTime = timestamp;
-    const velocity = getAutoScrollVelocity(dragState.currentPointerY);
-    if (velocity !== 0) {
-      scrollContainerElement.scrollTop += (velocity * elapsed) / 1000;
-      updatePointerDrag(dragState.currentPointerY);
-    }
-
-    autoScrollFrame = window.requestAnimationFrame(runAutoScroll);
-  }
-
-  function getAutoScrollVelocity(clientY: number): number {
-    if (!scrollContainerElement) {
-      return 0;
-    }
-
-    const rect = scrollContainerElement.getBoundingClientRect();
-    return calculateAutoScrollVelocity({
-      pointerY: clientY,
-      top: rect.top,
-      bottom: rect.bottom,
-      scrollTop: scrollContainerElement.scrollTop,
-      maxScrollTop: scrollContainerElement.scrollHeight - scrollContainerElement.clientHeight
-    });
-  }
-
-  function handleAccountDragKey(account: AuthenticatorAccount, event: KeyboardEvent) {
-    if (reorderSaving || reorderDisabled) {
-      return;
-    }
-
-    if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (keyboardDraggingAccountId === account.id) {
-        const accounts = dragAccounts;
-        keyboardDraggingAccountId = null;
-        if (accounts) {
-          void commitAccountOrder(accounts);
-        }
-      } else {
-        cleanupAccountDrag();
-        reorderSourceIds = vault.sortedAccounts.map((item) => item.id);
-        keyboardDraggingAccountId = account.id;
-        dragAccounts = orderedAccounts;
+      notice = t("copied");
+      if (space.preferences.paste) {
+        const filled = await request<boolean>("fill", {
+          code,
+          source: sourceWindow(),
+        });
+        if (!filled) throw new InputError("unavailable");
       }
-      return;
-    }
-
-    if (event.key === 'Escape' && keyboardDraggingAccountId === account.id) {
-      event.preventDefault();
-      event.stopPropagation();
-      cleanupAccountDrag();
-      return;
-    }
-
-    if (
-      keyboardDraggingAccountId !== account.id ||
-      !['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight'].includes(event.key)
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    const accounts = dragAccounts ?? orderedAccounts;
-    const fromIndex = accounts.findIndex((item) => item.id === account.id);
-    const delta = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1;
-    const toIndex = Math.max(0, Math.min(accounts.length - 1, fromIndex + delta));
-    if (fromIndex === -1 || fromIndex === toIndex) {
-      return;
-    }
-
-    const handle = event.currentTarget as HTMLElement;
-    dragAccounts = moveItem(accounts, fromIndex, toIndex);
-    void tick().then(() => handle.scrollIntoView({ block: 'nearest', behavior: 'auto' }));
+    });
   }
-
-  function handleAccountDragBlur(account: AuthenticatorAccount) {
-    if (keyboardDraggingAccountId !== account.id || !dragAccounts) {
-      return;
-    }
-
-    const accounts = dragAccounts;
-    keyboardDraggingAccountId = null;
-    void commitAccountOrder(accounts);
+  async function showQr(item: Credential) {
+    await attempt(async () => {
+      const [{ qrImage }, { toUri }] = await Promise.all([
+        import("./domain/qr"),
+        import("./domain/transfer"),
+      ]);
+      const image = await qrImage(toUri(item));
+      if (!locked) qr = { image, name: item.provider || item.login };
+    });
   }
-
-  async function commitAccountOrder(accounts: AuthenticatorAccount[]) {
-    const current = reorderSourceIds && isReorderCurrent(vault.sortedAccounts, reorderSourceIds);
-    cleanupAccountDrag();
-    if (!current) return;
-    dragAccounts = accounts;
-    reorderSaving = true;
+  async function refreshCodes() {
+    if (locked || !ready || document.hidden) return;
+    const stamp = ++generation;
+    const pairs = await Promise.all(
+      records.map(async (item) => [item.id, await codeFor(item, now)] as const),
+    );
+    if (stamp === generation && !locked) codes = Object.fromEntries(pairs);
+  }
+  async function sync() {
+    if (syncing || locked || !space.connection) return;
+    syncing = true;
     try {
-      await persistAccountOrder(accounts);
+      await change(synchronize);
+    } catch (err) {
+      error = explain(err);
     } finally {
-      dragAccounts = null;
-      reorderSaving = false;
+      syncing = false;
     }
   }
-
-  async function persistAccountOrder(accounts: AuthenticatorAccount[]) {
-    try {
-      await vault.reorderAccounts(accounts.map((account) => account.id));
-    } catch (error) {
-      vault.error = getErrorMessage(error, 'Unable to update account order.');
-    }
-  }
-
-  function getPointerAccountIndex(clientY: number, state: AccountDragState): number {
-    if (!scrollContainerElement || state.itemRects.length === 0) {
-      return -1;
-    }
-
-    const scrollRect = scrollContainerElement.getBoundingClientRect();
-    const draggedCenter =
-      clientY -
-      scrollRect.top +
-      scrollContainerElement.scrollTop -
-      state.pointerOffsetY +
-      state.itemHeight / 2;
-
-    const downwardSwitchRatio = 0.56;
-    const upwardSwitchRatio = 0.44;
-    let targetIndex = state.startIndex;
-
-    for (let index = state.startIndex + 1; index < state.itemRects.length; index += 1) {
-      const rect = state.itemRects[index];
-      if (draggedCenter > rect.top + rect.height * downwardSwitchRatio) {
-        targetIndex = index;
+  $effect(() => {
+    const theme = space.preferences.theme;
+    document.documentElement.dataset.theme =
+      theme === "system"
+        ? matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : theme;
+    document.documentElement.lang = space.preferences.locale;
+    document.documentElement.dir =
+      space.preferences.locale === "ar" ? "rtl" : "ltr";
+  });
+  $effect(() => {
+    void now;
+    void space;
+    void locked;
+    void ready;
+    void refreshCodes().catch((err) => {
+      error = explain(err);
+    });
+  });
+  onMount(() => {
+    const biometricEntry =
+      new URL(location.href).searchParams.get("entry") === "touchID";
+    const quick = takeQuickEntry();
+    const initialView = new URL(location.href).searchParams.get("view");
+    if (initialView === "data" || initialView === "settings")
+      view = initialView;
+    void readWorkspace()
+      .then((latest) => {
+        space = latest;
+        bypassed = Boolean(quick && latest.gate?.quick && !document.hidden);
+        if (bypassed) bypassOpenedAt = Date.now();
+        locked =
+          Boolean(latest.gate) &&
+          (!cacheIsOpen(latest.gate) || document.hidden) &&
+          !bypassed;
+        ready = true;
+        if (!locked) void sync();
+        else if (biometricEntry && latest.gate?.touchID) void unlockTouchID();
+      })
+      .catch((err) => {
+        error = explain(err);
+      });
+    void request<{ hostname: string }>("context", { source: sourceWindow() })
+      .then((value) => {
+        hostname = value.hostname;
+      })
+      .catch(() => {});
+    const unsubscribe = subscribeWorkspace(() => {
+      void readWorkspace()
+        .then(accept)
+        .catch((err) => {
+          error = explain(err);
+        });
+    });
+    const tick = setInterval(() => {
+      now = Date.now();
+      if (
+        !locked &&
+        panelExpired(
+          space.gate,
+          bypassed ? bypassOpenedAt : space.gate?.unlockedAt,
+          now,
+        )
+      )
+        lock();
+    }, 1000);
+    const interval = setInterval(() => {
+      void sync();
+    }, 15000);
+    const visibility = () => {
+      if (document.hidden) lock();
+      else
+        void readWorkspace()
+          .then(accept)
+          .catch((err) => {
+            error = explain(err);
+          });
+    };
+    document.addEventListener("visibilitychange", visibility);
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const theme = () => {
+      if (space.preferences.theme === "system")
+        document.documentElement.dataset.theme = media.matches
+          ? "dark"
+          : "light";
+    };
+    media.addEventListener("change", theme);
+    return () => {
+      unsubscribe();
+      clearInterval(tick);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", visibility);
+      media.removeEventListener("change", theme);
+    };
+  });
+  function escape(event: KeyboardEvent) {
+    if (event.key === "Tab" && (qr || remove)) {
+      const dialog = document.querySelector('[aria-modal="true"]');
+      const buttons = Array.from(
+        dialog?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ??
+          [],
+      );
+      const first = buttons[0],
+        last = buttons.at(-1);
+      if (
+        !dialog?.contains(document.activeElement) ||
+        (event.shiftKey && document.activeElement === first) ||
+        (!event.shiftKey && document.activeElement === last)
+      ) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
       }
     }
-
-    for (let index = state.startIndex - 1; index >= 0; index -= 1) {
-      const rect = state.itemRects[index];
-      if (draggedCenter < rect.top + rect.height * upwardSwitchRatio) {
-        targetIndex = index;
-      }
-    }
-
-    return targetIndex;
-  }
-
-  function getAccountRows(): HTMLElement[] {
-    return Array.from(accountListElement?.querySelectorAll<HTMLElement>('[data-account-id]') ?? []);
-  }
-
-  function getAccountDragStyle(account: AuthenticatorAccount): string {
-    if (!dragState) {
-      return '';
-    }
-
-    const index = dragState.itemRects.findIndex((rect) => rect.id === account.id);
-    if (index === -1) {
-      return '';
-    }
-
-    if (account.id === dragState.accountId) {
-      const scrollDelta =
-        (scrollContainerElement?.scrollTop ?? dragState.scrollTopAtStart) - dragState.scrollTopAtStart;
-      let offset = dragState.currentPointerY - dragState.startPointerY + scrollDelta;
-      const currentRect = dragState.itemRects[index];
-      const firstRect = dragState.itemRects[0];
-      const lastRect = dragState.itemRects.at(-1);
-      if (lastRect) {
-        const minOffset = firstRect.top - currentRect.top;
-        const maxOffset = lastRect.top + lastRect.height - currentRect.top - currentRect.height;
-        offset = rubberbandOffset(offset, minOffset, maxOffset, dragState.itemHeight);
-      }
-      return `position: relative; z-index: 30; transform: translate3d(0, ${offset}px, 0); transition: none; will-change: transform;`;
-    }
-
-    const offset = getDisplacedAccountOffset(index, dragState);
-    const transition = prefersReducedMotion.current
-      ? 'none'
-      : 'transform 150ms var(--auth-ease-in-out)';
-    const willChange = offset === 0 ? '' : ' will-change: transform;';
-    return `transform: translate3d(0, ${offset}px, 0); transition: ${transition};${willChange}`;
-  }
-
-  function getDisplacedAccountOffset(index: number, state: AccountDragState): number {
-    if (state.currentIndex > state.startIndex && index > state.startIndex && index <= state.currentIndex) {
-      return -state.itemHeight;
-    }
-    if (state.currentIndex < state.startIndex && index >= state.currentIndex && index < state.startIndex) {
-      return state.itemHeight;
-    }
-    return 0;
-  }
-
-  function accountTitle(account: AuthenticatorAccount): string {
-    return account.issuer ? `${account.issuer} · ${account.label}` : account.label;
-  }
-
-  // Without this, a file dropped on the window replaces the app with that file.
-  // Import screens add their own handlers on top and still see the event.
-  function blockFileNavigation(event: DragEvent) {
-    if (event.dataTransfer?.types.includes('Files')) {
-      event.preventDefault();
-    }
+    if (event.key !== "Escape") return;
+    if (qr) qr = undefined;
+    else if (remove) remove = undefined;
+    else if (editing !== undefined) editing = undefined;
+    else void lockNow();
   }
 </script>
 
-<svelte:head>
-  <title>{tr('appName')}</title>
-</svelte:head>
-
-<svelte:window ondragover={blockFileNavigation} ondrop={blockFileNavigation} />
-<svelte:document onvisibilitychange={lockHiddenPanel} />
-
-{#snippet accountRows(accounts: AuthenticatorAccount[])}
-  {#each accounts as account (account.id)}
-    <AccountRow
-      {account}
-      code={vault.codes[account.id]}
-      suggestedForSite={pageRanking.suggestedAccountIds.has(account.id)}
-      showReorder={manualSort}
-      reorderDisabled={reorderDisabled}
-      reorderPending={reorderSaving}
-      dragging={activeDragAccountId === account.id}
-      dragStyle={getAccountDragStyle(account)}
-      oncodecopy={copyCode}
-      onactions={(item) => (actionsFor = item)}
-      onreorderstart={startAccountDrag}
-      onreorderkey={handleAccountDragKey}
-      onreorderblur={handleAccountDragBlur}
-    />
-  {/each}
-{/snippet}
-
-<div class={[
-  'contents',
-  vault.locked && '[&_.vault-unlocked]:hidden',
-  !vault.hasVault && '[&_[inert]]:hidden'
-]} data-theme={themeOverride}>
-<main
-  class="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-base-100 text-base-content"
->
-  {#if !vault.initialized || (!vault.locked && !pageContextReady)}
-    <div class="grid h-full place-items-center">
-      <span class="loading loading-spinner loading-lg text-primary"></span>
+<svelte:window onkeydown={escape} />
+<div class="shell">
+  <header class="masthead">
+    <div class="brand-mark" aria-hidden="true">▥</div>
+    <div class="min-w-0">
+      <p class="eyebrow">AUTHENTICATOR</p>
+      <h1>2FA</h1>
     </div>
-  {:else if vault.locked}
-    <VaultGate hasVault={vault.hasVault} busy={vault.busy} oncreate={createVault} onunlock={unlockVault} />
-    {#if vault.error}
-      <p class="px-6 pb-4 text-center text-sm text-error" transition:fade={FADE_TRANSITION} role="alert">{vault.error}</p>
-    {/if}
-    {#if pageScanError}
-      <p class="px-6 pb-4 text-center text-sm text-error" transition:fade={FADE_TRANSITION} role="alert">{pageScanError}</p>
-    {/if}
-  {:else}
-    <section class="vault-unlocked absolute inset-0 flex min-h-0 flex-col overflow-hidden">
-      {#if view === 'settings'}
-        <div
-          class="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden bg-base-100"
-          transition:viewTransition={{ x: 20, instant: !animateViewTransition }}
-        >
-          <SettingsView
-            initialPanel={settingsPanel}
-            onback={showCodes}
-            oncontextualsortchange={setContextualSorting}
-          />
-        </div>
-      {:else}
-        <div
-          class="absolute inset-0 flex min-h-0 flex-col overflow-hidden bg-base-100"
-          transition:viewTransition={{ x: -20, instant: !animateViewTransition }}
-        >
-          <AppBar onsettings={showSettings} />
-
-          <!-- The reserved gutter keeps the list from shifting sideways when
-               revealing more codes makes the scrollbar appear. -->
-          <div
-            class="auth-scroll-area flex grow flex-col overflow-y-auto pb-20"
-            bind:this={scrollContainerElement}
-          >
-            {#if vault.accounts.length > 0}
-              <div class="auth-sticky-search sticky top-0 z-10 bg-base-100/95 px-3 py-2 backdrop-blur">
-                <label class="auth-search-input input input-md w-full items-center gap-2">
-                  <Search class="shrink-0 text-base-content/45" size={18} aria-hidden="true" />
-                  <input class="grow text-base" type="search" placeholder={tr('search')} bind:value={query} />
-                </label>
-              </div>
-            {/if}
-
-            {#if filteredAccounts.length > 0}
-              <ul
-                class="divide-y divide-base-200"
-                aria-label={tr('accounts')}
-                bind:this={accountListElement}
-              >
-                {@render accountRows(filteredAccounts)}
-              </ul>
-
-              {#if accountListView.contextualAction}
-                <!-- Sits between the site matches and the rest, so it stays in
-                     the same place whichever way the list is showing. -->
-                <div class="flex items-center gap-2 px-3 py-2.5">
-                  <span class="h-px grow bg-base-200/70" aria-hidden="true"></span>
-                  <button
-                    class="btn btn-xs h-7 shrink-0 gap-1.5 rounded-full border-0 bg-base-200/70 px-3 text-xs font-medium text-base-content/70 shadow-none hover:bg-base-200 hover:text-base-content"
-                    type="button"
-                    aria-controls="other-codes"
-                    aria-expanded={codesRevealed}
-                    onclick={toggleContextualAccountView}
-                  >
-                    {codesRevealed ? tr('showSiteMatches') : tr('showAllCodes')}
-                    {#if !codesRevealed}
-                      <span class="tabular-nums opacity-55">{accountListView.hiddenCount}</span>
-                    {/if}
-                    <ChevronDown
-                      class={['transition-transform duration-200', codesRevealed && 'rotate-180']}
-                      size={14}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <span class="h-px grow bg-base-200/70" aria-hidden="true"></span>
-                </div>
-
-                <div id="other-codes">
-                  {#if codesRevealed}
-                    <ul
-                      class="divide-y divide-base-200"
-                      aria-label={tr('otherCodes')}
-                      transition:panelReveal
-                    >
-                      {@render accountRows(accountListView.revealedAccounts)}
-                    </ul>
-                  {/if}
-                </div>
-              {/if}
-            {:else if vault.accounts.length === 0}
-              <div class="grid grow place-items-center p-8 text-center">
-                <div class="grid justify-items-center gap-3">
-                  <div class="grid size-16 place-items-center rounded-2xl bg-base-200 text-base-content/40">
-                    <KeyRound size={30} aria-hidden="true" />
-                  </div>
-                  <div class="grid gap-1">
-                    <p class="text-base font-semibold">{tr('empty')}</p>
-                    <p class="max-w-60 text-sm text-base-content/60">{tr('emptyHint')}</p>
-                  </div>
-                  <button class="btn btn-primary btn-sm mt-1" type="button" onclick={() => openAddDialog('qr')}>
-                    <Plus size={16} aria-hidden="true" />
-                    {tr('addAccount')}
-                  </button>
-                </div>
-              </div>
-            {:else}
-              <p class="p-8 text-center text-sm text-base-content/55">{tr('noResults')}</p>
-            {/if}
-          </div>
-
-          {#if vault.accounts.length > 0}
-            <button
-              class="btn btn-circle btn-primary btn-lg absolute bottom-4 right-4 z-20 shadow-lg"
-              type="button"
-              aria-label={tr('addAccount')}
-              title={tr('addAccount')}
-              onclick={() => openAddDialog('qr')}
-            >
-              <Plus size={24} aria-hidden="true" />
-            </button>
-          {/if}
-
-          <!-- Transient feedback -->
-          <Toast
-            message={vault.error || vault.notice}
-            variant={vault.error ? 'error' : 'notice'}
-            nonce={vault.noticeKey}
-          />
-        </div>
-      {/if}
-    </section>
-  {/if}
-</main>
-
-<!-- The root hides unlocked content immediately, including exit animations. -->
-<div class="vault-unlocked">
-<!-- Per-account actions sheet -->
-{#if actionsFor}
-  {@const account = actionsFor}
-  <MotionDialog
-    placement="sheet"
-    surfaceClass="p-0"
-    closeLabel={tr('cancel')}
-    onclose={() => (actionsFor = null)}
-  >
-    <div class="border-b border-base-200 px-4 py-3">
-      <p class="truncate font-semibold">{accountTitle(account)}</p>
-    </div>
-    <ul class="menu w-full gap-0.5 p-2 text-base">
-      <li>
-        <button
-          type="button"
-          onclick={() => {
-            void showQr(account);
-            actionsFor = null;
-          }}
-        >
-          <QrCode size={18} aria-hidden="true" />{tr('showQr')}
-        </button>
-      </li>
-      <li>
-        <button
-          type="button"
-          onclick={() => {
-            formError = '';
-            editing = account;
-            actionsFor = null;
-          }}
-        >
-          <Pencil size={18} aria-hidden="true" />{tr('edit')}
-        </button>
-      </li>
-      <li>
-        <button
-          class="text-error"
-          type="button"
-          onclick={() => {
-            formError = '';
-            deleting = account;
-            actionsFor = null;
-          }}
-        >
-          <Trash size={18} aria-hidden="true" />{tr('delete')}
-        </button>
-      </li>
-    </ul>
-  </MotionDialog>
-{/if}
-
-<!-- Add account -->
-{#if showAdd}
-  <MotionDialog
-    surfaceClass="max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-md overflow-y-auto p-4"
-    closeLabel={tr('cancel')}
-    onclose={() => (showAdd = false)}
-  >
-    <div class="mb-3 flex items-center justify-between gap-2">
-      <h2 class="text-lg font-bold">{tr('addAccount')}</h2>
-      <button
-        class="btn btn-ghost btn-sm btn-circle"
-        type="button"
-        aria-label={tr('cancel')}
-        onclick={() => (showAdd = false)}
+    {#if ready && !locked && space.gate}<button
+        class="btn btn-ghost btn-sm ms-auto"
+        onclick={lockNow}>{t("lock")}</button
+      >{/if}
+  </header>
+  {#if error}<div class="notice text-error" role="alert">
+      {error}<button
+        class="btn btn-ghost btn-xs"
+        aria-label={t("cancel")}
+        onclick={() => (error = "")}>×</button
       >
-        <X size={18} aria-hidden="true" />
-      </button>
-    </div>
-
-    <div class="join w-full">
-      {#each ADD_MODES as item (item.mode)}
-        {@const Icon = item.icon}
-        <button
-          class={['btn join-item flex-1 btn-sm px-1', addMode === item.mode ? 'btn-primary' : '']}
-          type="button"
-          onclick={() => selectAddMode(item.mode)}
-        >
-          <Icon size={15} aria-hidden="true" />
-          <span class="truncate">{tr(item.key)}</span>
-        </button>
-      {/each}
-    </div>
-
-    {#if addMode === 'qr'}
-      <div class="mt-4 grid gap-3" in:fade={PANEL_TRANSITION}>
-        <p class="text-sm leading-snug text-base-content/60">{tr('addQrDescription')}</p>
-
-        <button class="btn btn-primary btn-block" type="button" onclick={startPageScan} disabled={pageScanBusy || addBusy}>
-          <ScanLine size={16} aria-hidden="true" />
-          {pageScanState === 'starting' ? tr('scanPage') : tr('scanPageStart')}
-        </button>
-
-        <FilePickerButton
-          class="btn btn-block"
-          accept="image/*"
-          route="add-qr"
-          disabled={addBusy}
-          onfiles={importQrImages}
-          onerror={(message) => (addError = message)}
-        >
-          {#snippet children(opensWindow)}
-            <ImageUp size={16} aria-hidden="true" />
-            {tr('uploadQrImage')}
-            {#if opensWindow}
-              <ExternalLink class="opacity-60" size={14} aria-hidden="true" />
-            {/if}
-          {/snippet}
-        </FilePickerButton>
-
-        {#if pageScanMessage}
-          <div class="alert alert-info py-2 text-sm" transition:fade={FADE_TRANSITION} role="status">{pageScanMessage}</div>
-        {/if}
-        {#if pageScanError}
-          <div class="alert alert-error py-2 text-sm" transition:fade={FADE_TRANSITION} role="alert">{pageScanError}</div>
-        {/if}
-        {#if addStatus}
-          <div class="alert alert-info py-2 text-sm" transition:fade={FADE_TRANSITION} role="status">{addStatus}</div>
-        {/if}
-        {#if addError}
-          <div class="alert alert-error py-2 text-sm" transition:fade={FADE_TRANSITION} role="alert">{addError}</div>
-        {/if}
-      </div>
-    {:else if addMode === 'manual'}
-      <div class="mt-4" in:fade={PANEL_TRANSITION}>
-        {#if formError}
-          <div class="alert alert-error mb-3 py-2 text-sm" transition:fade={FADE_TRANSITION} role="alert">{formError}</div>
-        {/if}
-        <AccountForm onsubmit={saveNewAccount} oncancel={() => (showAdd = false)} />
-      </div>
-    {:else}
-      <div class="mt-4 grid gap-3" in:fade={PANEL_TRANSITION}>
-        <p class="text-sm leading-snug text-base-content/60">{tr('addPasteDescription')}</p>
-
-        <textarea
-          class="textarea min-h-32 w-full font-mono text-sm leading-relaxed"
-          bind:value={addImportText}
-          placeholder="otpauth://totp/..."
-          spellcheck="false"
-        ></textarea>
-
-        <button class="btn btn-primary btn-block" type="button" onclick={importAddText} disabled={addBusy || !addImportText.trim()}>
-          {#if addBusy}
-            <span class="loading loading-spinner loading-sm"></span>
-          {:else}
-            <Upload size={16} aria-hidden="true" />
-          {/if}
-          {tr('import')}
-        </button>
-
-        {#if addStatus}
-          <div class="alert alert-info py-2 text-sm" transition:fade={FADE_TRANSITION} role="status">{addStatus}</div>
-        {/if}
-        {#if addError}
-          <div class="alert alert-error py-2 text-sm" transition:fade={FADE_TRANSITION} role="alert">{addError}</div>
-        {/if}
-      </div>
-    {/if}
-  </MotionDialog>
-{/if}
-
-<!-- Edit account -->
-{#if editing}
-  <MotionDialog
-    surfaceClass="max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-md overflow-y-auto p-4"
-    closeLabel={tr('cancel')}
-    onclose={() => (editing = null)}
-  >
-    <h2 class="mb-3 text-lg font-bold">{tr('editAccount')}</h2>
-    {#if formError}
-      <div class="alert alert-error mb-3 py-2 text-sm" transition:fade={FADE_TRANSITION} role="alert">{formError}</div>
-    {/if}
-    <AccountForm initial={editing} onsubmit={saveEditedAccount} oncancel={() => (editing = null)} />
-  </MotionDialog>
-{/if}
-
-<!-- Delete confirmation -->
-{#if deleting}
-  <MotionDialog
-    surfaceClass="w-[calc(100vw-1.5rem)] max-w-sm p-4"
-    closeLabel={tr('cancel')}
-    onclose={() => (deleting = null)}
-  >
-    <h2 class="text-lg font-bold">{tr('delete')}</h2>
-    <p class="mt-2 wrap-break-word text-sm text-base-content/70">{accountTitle(deleting)}</p>
-    {#if formError}
-      <div class="alert alert-error mt-3 py-2 text-sm" role="alert">{formError}</div>
-    {/if}
-    <div class="modal-action grid grid-cols-2 gap-2">
-      <button class="btn" type="button" onclick={() => (deleting = null)}>{tr('cancel')}</button>
-      <button class="btn btn-error" type="button" onclick={deleteSelected}>{tr('delete')}</button>
-    </div>
-  </MotionDialog>
-{/if}
-
-<!-- QR display -->
-{#if qrAccount}
-  <MotionDialog
-    surfaceClass="grid w-[calc(100vw-1.5rem)] max-w-sm justify-items-center gap-3 p-4 text-center"
-    closeLabel={tr('cancel')}
-    onclose={closeQr}
-  >
-    <h2 class="text-lg font-bold">{tr('showQr')}</h2>
-    <p class="wrap-break-word text-sm text-base-content/70">{accountTitle(qrAccount)}</p>
-    {#if qrDataUrl}
-      <div class="grid w-full justify-items-center gap-3" transition:fade={FADE_TRANSITION}>
-        <img class="w-full max-w-64 rounded-box border border-base-300 bg-white p-2" src={qrDataUrl} alt={tr('showQr')} />
-        <a class="btn btn-block" href={qrDataUrl} download={`${qrAccount.label || 'account'}-qr.png`}>
-          <Download size={16} aria-hidden="true" />
-          QR
-        </a>
-      </div>
-    {/if}
-    <div class="modal-action mt-0 w-full">
-      <button class="btn btn-primary btn-block" type="button" onclick={closeQr}>{tr('cancel')}</button>
-    </div>
-  </MotionDialog>
-{/if}
+    </div>{/if}
+  {#if !ready}<main><p role="status">{t("loading")}</p></main>
+  {:else if locked}<main class="gate">
+      <div class="gate-symbol" aria-hidden="true">⌑</div>
+      <h2>{t("unlock")}</h2>
+      <form
+        class="stack"
+        onsubmit={(e) => {
+          e.preventDefault();
+          void unlock();
+        }}
+      >
+        <label class="field"
+          >{t("password")}<input
+            class="input w-full"
+            type="password"
+            minlength="1"
+            required
+            bind:value={password}
+            autocomplete="current-password"
+          /></label
+        ><button class="btn btn-primary" disabled={busy}>{t("unlock")}</button>
+      </form>
+      {#if space.gate?.touchID && isMac()}<button
+          class="btn btn-outline w-full mt-4"
+          disabled={busy}
+          onclick={unlockTouchID}>{t("touchIDUnlock")}</button
+        >{/if}
+    </main>
+  {:else}
+    <main>
+      {#if editing !== undefined}<CredentialEditor
+          original={editing ?? undefined}
+          {t}
+          {save}
+          cancel={() => (editing = undefined)}
+        />
+      {:else if view === "codes"}
+        <div class="section-title">
+          <h2>{t("codes")} <span class="count">{records.length}</span></h2>
+          <button
+            class="btn btn-primary btn-sm"
+            onclick={() => (editing = null)}>＋ {t("add")}</button
+          >
+        </div>
+        {#if records.length}<label class="search"
+            ><input
+              class="input w-full"
+              aria-label={t("search")}
+              placeholder={t("search")}
+              bind:value={search}
+            /></label
+          >{/if}
+        {#if !records.length}<div class="empty">
+            <p class="empty-glyph" aria-hidden="true">＋</p>
+            <h3>{t("empty")}</h3>
+            <p class="hint">{t("emptyHint")}</p>
+            <button
+              class="btn btn-outline mt-5"
+              onclick={() => (editing = null)}>{t("add")}</button
+            >
+          </div>{/if}
+        <ol class="accounts">
+          {#each visible as item (item.id)}<li class="account">
+              <div class="account-top">
+                <span class="monogram" aria-hidden="true"
+                  >{(item.provider || item.login)
+                    .slice(0, 1)
+                    .toUpperCase()}</span
+                >
+                <div class="account-label">
+                  <h3>{item.provider || item.login}</h3>
+                  {#if item.provider}<p>
+                      {item.login}
+                    </p>{/if}{#if space.preferences.matchSite && matchesSite(item, hostname)}<span
+                      class="badge badge-xs badge-outline">{t("match")}</span
+                    >{/if}
+                </div>
+                <details class="dropdown dropdown-end">
+                  <summary
+                    class="btn btn-ghost btn-sm"
+                    aria-label={`${t("edit")} ${item.login}`}>•••</summary
+                  >
+                  <ul
+                    class="dropdown-content menu bg-base-200 rounded-box z-10 w-40 shadow-lg"
+                  >
+                    <li>
+                      <button onclick={() => (editing = item)}
+                        >{t("edit")}</button
+                      >
+                    </li>
+                    <li>
+                      <button onclick={() => showQr(item)}>{t("showQr")}</button
+                      >
+                    </li>
+                    <li>
+                      <button
+                        disabled={records[0]?.id === item.id}
+                        onclick={() =>
+                          attempt(() =>
+                            change((s) => {
+                              const i = activeRecords(s).findIndex(
+                                (x) => x.id === item.id,
+                              );
+                              if (i > 0)
+                                moveRecord(
+                                  s,
+                                  item.id,
+                                  activeRecords(s)[i - 1]!.id,
+                                );
+                            }),
+                          )}>{t("moveUp")}</button
+                      >
+                    </li>
+                    <li>
+                      <button
+                        disabled={records.at(-1)?.id === item.id}
+                        onclick={() =>
+                          attempt(() =>
+                            change((s) => {
+                              const list = activeRecords(s),
+                                i = list.findIndex((x) => x.id === item.id);
+                              if (i >= 0 && i < list.length - 1)
+                                moveRecord(s, item.id, list[i + 1]!.id);
+                            }),
+                          )}>{t("moveDown")}</button
+                      >
+                    </li>
+                    <li>
+                      <button class="text-error" onclick={() => (remove = item)}
+                        >{t("remove")}</button
+                      >
+                    </li>
+                  </ul>
+                </details>
+              </div>
+              <div class="code-line">
+                <button
+                  class="code-button"
+                  aria-label={`${t("copy")} ${item.provider} ${item.login}`}
+                  onclick={() => copy(item)}
+                  >{space.preferences.conceal
+                    ? "••• •••"
+                    : (codes[item.id] ?? "—")}</button
+                >{#if item.mode !== "hotp" && space.preferences.seconds}<span
+                    class="timer"
+                    aria-label={t("seconds")}
+                    >{item.interval -
+                      (Math.floor(now / 1000) % item.interval)}<span>s</span
+                    ></span
+                  >{:else if item.mode === "hotp"}<span class="hint"
+                    >#{item.counter}</span
+                  >{/if}
+              </div>
+              {#if item.mode !== "hotp"}<progress
+                  class="progress progress-primary h-0.5"
+                  aria-label={t("seconds")}
+                  value={item.interval -
+                    (Math.floor(now / 1000) % item.interval)}
+                  max={item.interval}
+                ></progress>{/if}
+            </li>{/each}
+        </ol>
+      {:else if view === "data"}<TransferView
+          {space}
+          {t}
+          {importItems}
+          scan={async () => {
+            await request("scan", { source: sourceWindow() });
+            window.close();
+          }}
+        />
+      {:else}<PreferencesView {space} {t} {change} />{/if}
+    </main>
+    {#if notice}<div
+        role="status"
+        class="toast toast-bottom toast-center pointer-events-none"
+      >
+        <div class="alert bg-neutral text-neutral-content">
+          {notice}<button
+            class="btn btn-ghost btn-xs pointer-events-auto"
+            aria-label={t("cancel")}
+            onclick={() => (notice = "")}>×</button
+          >
+        </div>
+      </div>{/if}
+    <nav class="bottom-nav" aria-label={t("appName")}>
+      {#each [["codes", "codes"], ["data", "data"], ["settings", "settings"]] as [tab, label] (tab)}<button
+          class:active={view === tab}
+          aria-current={view === tab ? "page" : undefined}
+          onclick={() => {
+            view = tab!;
+            editing = undefined;
+            notice = "";
+          }}>{t(label as MessageKey)}</button
+        >{/each}
+    </nav>
+  {/if}
 </div>
-</div>
+{#if remove}<div class="modal modal-open" role="presentation">
+    <div
+      class="modal-box"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="remove-title"
+      tabindex="-1"
+    >
+      <h2 id="remove-title">{t("removeConfirm")}</h2>
+      <p class="break-all my-4">{remove.provider} · {remove.login}</p>
+      <div class="modal-action">
+        <button class="btn" onclick={() => (remove = undefined)}
+          >{t("cancel")}</button
+        ><button
+          class="btn btn-error"
+          onclick={() =>
+            attempt(async () => {
+              const item = remove!;
+              await change((s) => {
+                const current = s.records[item.id];
+                if (!current || current.changed !== item.changed)
+                  throw new InputError("stale");
+                s.records[item.id] = {
+                  ...current,
+                  removed: true,
+                  changed: nextChange(current.changed),
+                };
+              });
+              remove = undefined;
+            })}>{t("remove")}</button
+        >
+      </div>
+    </div>
+  </div>{/if}
+{#if qr}<div class="modal modal-open" role="presentation">
+    <div
+      class="modal-box text-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="qr-title"
+      tabindex="-1"
+    >
+      <h2 id="qr-title">{qr.name}</h2>
+      <img src={qr.image} alt={t("showQr")} class="mx-auto my-4 max-w-full" />
+      <p class="hint">{t("plainWarning")}</p>
+      <button class="btn mt-4" onclick={() => (qr = undefined)}
+        >{t("back")}</button
+      >
+    </div>
+  </div>{/if}

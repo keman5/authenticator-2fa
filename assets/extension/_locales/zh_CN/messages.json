@@ -1,20 +1,20 @@
 {
-  "extensionName": {
-    "message": "身份验证器 - 2FA"
+  "name": {
+    "message": "Authenticator - 2FA"
   },
-  "extensionShortName": {
-    "message": "身份验证器"
+  "shortName": {
+    "message": "2FA Codes"
   },
-  "extensionDescription": {
-    "message": "支持二维码导入与可选密码保护的两步验证码。"
+  "description": {
+    "message": "动态验证码、可选界面锁与加密备份。"
   },
-  "actionTitle": {
-    "message": "打开身份验证器 - 2FA"
+  "title": {
+    "message": "Authenticator - 2FA"
   },
-  "commandOpenPopup": {
-    "message": "打开弹出窗口"
+  "normal": {
+    "message": "通过界面锁打开"
   },
-  "commandOpenWithoutPassword": {
-    "message": "跳过密码直接打开"
+  "direct": {
+    "message": "直接打开"
   }
 }

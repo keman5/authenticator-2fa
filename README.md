@@ -1,88 +1,78 @@
 # Authenticator - 2FA
 
-Browser extension for generating and managing two-factor authentication codes.
+An independently written WebExtension for TOTP, HOTP and Steam codes. This branch replaces the previous application's implementation, UI, storage model and artwork. The prior MIT notice is retained in `docs/previous-license.txt`; Git history is retained. This is not a certified clean-room rewrite.
 
-**Privacy:** Authenticator - 2FA does not track users or collect analytics. Accounts stay on your device by default. The optional password is an interface lock; local accounts and sync recovery credentials are stored without encryption. If you enable Browser Sync, account names and secrets are encrypted before upload through your browser provider's sync service.
+## Use
 
-![Authenticator - 2FA promo](assets/store/promotional/marquee-promo-tile.png)
+- Add accounts manually, import `otpauth://` links, QR images, Google migration QR codes, or JSON backups. Search, edit and reorder accounts from the code list.
+- Click a code to copy it. HOTP advances after copying. Optional page fill writes only to identifiable OTP inputs and never submits a form.
+- Password protection is off initially. Enable a screen password in Settings; one character is sufficient. This is an **interface lock**: account secrets remain unencrypted in this extension's local storage.
+- Enable direct entry explicitly in Settings. The `open-direct` command defaults to Command+Shift+8 on macOS / Ctrl+Shift+8 elsewhere. The normal action defaults to Command+Shift+2 / Ctrl+Shift+2. Browser conflicts may require changing these shortcuts. A direct entry is consumed once and never updates the saved unlock timestamp. With the default “lock on close” setting, normal reopening requires the password. The direct-entry setting survives browser restarts.
+- Auto-lock defaults to closing the panel. Other choices are 30 seconds, every minute from 1–10 minutes, 30 minutes, every hour from 1–24 hours, every day from 3–30 days, or forever. Successful password or Touch ID authentication starts a fresh deadline. Normal reopening and browser restart preserve access until that deadline; activity and shortcut bypass do not extend it. Explicit Lock clears the cached timestamp, including for forever. Timed panels check expiry once per second.
+- Optional Touch ID on supported Macs verifies a fingerprint through Apple LocalAuthentication. Set a screen password first, then enable Touch ID in Settings. It does not encrypt local account data.
+- Export an encrypted backup with a separate password, or an explicitly selected plaintext JSON/URI file. Backups contain accounts, not the screen password or cloud recovery key.
+- Encrypted browser sync uses a separate recovery key. Create a sync group on the first device, copy its recovery key, then join on another device using the same browser sync account. Preferences and screen passwords remain local. Safari's `storage.sync` is local only, so this sync option is disabled there. Different browser vendors do not share their sync services.
 
-## Install
+## Local development and builds
 
-[![Install from Chrome Web Store](https://img.shields.io/badge/Install%20from-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/authenticator-2fa/pphhggggadbehnhklioamemafkeegfjf)
-[![Install from Microsoft Edge Add-ons](https://img.shields.io/badge/Install%20from-Microsoft%20Edge%20Add--ons-0078D7?style=for-the-badge&logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/lngkiejjggjenmeelgcadhilloeffkdl)
-[![Install from Firefox Add-ons](https://img.shields.io/badge/Install%20from-Firefox%20Add--ons-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/authenticator-2fa/)
-
-## Features
-
-- Generate TOTP, HOTP, and Steam-style 2FA codes.
-- Add accounts from QR images, page QR scans, pasted otpauth text, or manual entry.
-- Search, copy, manually reorder accounts, or focus on likely codes for the current site with one-click access to the rest.
-- Import by dropping or picking QR images, otpauth text, JSON, or password-protected backups; export the same way.
-- Optional local vault password protection.
-- Optional encrypted Browser Sync across supported devices using the same browser account.
-- Local-first storage with no account service.
-
-**Important: Users are responsible for maintaining their own backups of 2FA codes and recovery methods. We are not responsible for lost, deleted, inaccessible, or unrecoverable 2FA codes.**
-
-## Browser Sync
-
-Open **Settings → Browser Sync**, set a local vault password, choose **Set up sync**, and save the generated recovery key. On another supported device, sign into the same browser account, choose **Connect to existing sync**, and enter that key. Enable extension syncing in your browser settings.
-
-Sync works within one browser provider. Accounts, edits, and deletions sync while the extension is open and unlocked; preferences and ordering stay local. Keep independent backups and use HOTP accounts on one device at a time.
-
-See [sync security, recovery, and limits](docs/browser-sync.md).
-
-## Development
-
-Use Node.js 24 and the pnpm version pinned in `package.json` (12.11.2).
+Requires Node.js 24 and the pnpm version in `package.json`.
 
 ```sh
-pnpm install
-pnpm run dev
-```
-
-Useful commands:
-
-```sh
+pnpm install --frozen-lockfile
 pnpm run check
 pnpm run test
 pnpm run build
-pnpm run package
+./build.sh package
 ```
 
-`./build.sh` builds extension resources for Chrome, Edge, Firefox, and Safari into `dist/<browser>/`. Other Chromium browsers can use the Chrome build. `pnpm run package` packages these resources into `artifacts/`; the Safari zip is source resources, not an installable Safari app.
+`build.sh` performs all builds locally and cleans Go's build cache when Go is available, plus this project's `.artifacts` cache. Output resources are `dist/chrome`, `dist/edge`, `dist/firefox` and `dist/safari`. Package archives and a review-source archive appear in `artifacts/`. Third-party license notices are included. No build installs an extension, modifies browser profiles or publishes a release.
 
-On macOS with Xcode installed, `./build.sh safari` also generates an Xcode project and builds an unsigned macOS Safari container in `dist/safari-native/Build/Products/Release/`. This development build requires Safari's **Allow Unsigned Extensions** setting; distribution requires Apple signing and packaging. The minimum macOS deployment target is 13.3. No installed extension or browser setting is changed by the script.
-
-The default password-bypass shortcut is **Command+Shift+8** on macOS and **Ctrl+Shift+8** elsewhere. It only bypasses the interface lock when explicitly enabled in settings. Clicking the toolbar icon still asks for the password. Chrome and Edge open their shortcut settings from the extension; Firefox opens its add-on manager, where **Manage Extension Shortcuts** is available. Safari displays the registered shortcut and uses its own extension settings; older Safari versions only support the manifest default. Existing installations may retain their previous shortcut assignment, and conflicting shortcuts may need reassignment.
-
-Safari supports local accounts, imports, exports, and the interface lock, but Browser Sync is disabled: its `storage.sync` API stores locally and does not synchronize across devices. See [platform support](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/sync).
-
-## Store Assets
-
-Project assets are grouped under `assets/` by lifecycle:
-
-- `assets/brand/` source artwork for generated extension icons
-- `assets/extension/` static files copied into extension packages
-- `assets/store/` store icons, screenshots, and promo tiles kept outside the extension bundle
-
-Regenerate screenshots and promo tiles with:
+For a universal macOS Safari container, install Xcode and run:
 
 ```sh
-pnpm run store:screenshots
+./build.sh safari
 ```
 
-This command uses synthetic demo accounts and a local browser to render store-ready images.
-Temporary store listing text drafts can live in `.tmp/store-listing/`, which is ignored by git.
+This generates a new `Authenticator Workspace.app` with bundle identifier `local.Authenticator-Workspace`, built for arm64 and x86_64, under `dist/safari-native/Build/Products/Release/`. It is unsigned. Safari distribution requires Apple signing and the applicable distribution workflow. The extension inside retains the product name Authenticator - 2FA.
 
-## Releases
+## Touch ID on macOS
 
-Pushing a tag like `v1.2.3` runs the release workflow. The workflow applies the tag version, builds all targets, packages the zips, creates the GitHub release, and uploads the browser extension assets.
+Chrome, Edge and Firefox need the local native-messaging companion. Build it locally:
 
-## Origins
+```sh
+./build.sh native
+```
 
-Authenticator - 2FA was inspired by the open-source [Authenticator browser extension](https://github.com/Authenticator-Extension/Authenticator). This project is a complete from-scratch rewrite, created after that extension became unmaintained, with a new codebase focused on fixing many long-standing issues while preserving a simple local-first authenticator workflow.
+Copy the Chromium extension ID shown in Settings, then register the companion (this command explicitly installs into your user Library and registers the three browsers):
 
-## License
+```sh
+node scripts/install-touch-id.mjs YOUR_CHROMIUM_EXTENSION_ID
+```
 
-MIT
+You can pass multiple Chromium IDs separated by spaces. Firefox uses the fixed extension ID automatically; local unpacked `dist/chrome` and `dist/edge` IDs are also included. Registration allows only these exact IDs. Restart the browser after registration if needed, then use “Set up Touch ID”. No password, account secret or encryption key is sent to the native component. Cancelled or failed fingerprint verification leaves the panel locked, with the screen password available as fallback. Toolbar popups move into a persistent extension window for authentication because system dialogs can dismiss browser popups.
+
+`./build.sh package` includes the built companion and installer in a separate macOS ZIP. After extracting it, run `node install-touch-id.mjs YOUR_CHROMIUM_EXTENSION_ID` from that folder. The companion is ad-hoc signed locally, not Developer ID signed or notarized; public distribution requires that separate signing workflow. Safari's generated app embeds the same Touch ID handler and needs no separate host registration, but must be signed and enabled through Safari's normal extension workflow.
+
+The following background check validates the actual native framing, availability probe and installer in a disposable directory; it never requests a fingerprint or installs into your regular profile:
+
+```sh
+node scripts/check-native.mjs
+```
+
+An optional real-extension smoke check runs Edge in a temporary headless profile and removes the profile when done:
+
+```sh
+node scripts/check-ui.mjs
+```
+
+It uses the local Edge binary by default; set `EDGE_BINARY` to another Chromium-compatible binary if necessary. It does not open foreground windows or touch your everyday profile.
+
+## Identity, migration and Firefox distribution
+
+Firefox uses a new fixed extension ID: `{7a3868f2-5531-488e-9378-ac5c769c3c01}`. No original publisher key or store listing is reused. Chromium store identity will be assigned by the new store listing. Do not upload this as an update to someone else's listing.
+
+The new extension cannot automatically read the previous extension's private storage. Export from the old installation first, then import here. Plain account JSON and the former PBKDF2/AES-GCM backup envelope are supported. Keep the old installation until import and code comparison succeed. Screen-lock settings and browser-sync recovery keys are not imported.
+
+Rewriting does not bypass signing or store review. Mozilla signing is needed for ordinary Firefox installs. An unlisted signed XPI supports manual installation but does not provide automatic add-on installation through Firefox Sync. For that workflow, publish and obtain approval for your own public AMO listing, then enable add-on synchronization. Syncing the installation and syncing account records are separate operations. This repository's build does not submit or sign an XPI.
+
+See `docs/rewrite.md` for architecture and scope. Runtime code and QR decoding stay within the package; there is no remote executable code, analytics or developer-operated server.

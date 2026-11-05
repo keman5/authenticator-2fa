@@ -48,10 +48,7 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Check and test
-        run: pnpm run test
-
-      - name: Generate icons
-        run: pnpm run icons
+        run: pnpm run check && pnpm run test
 
       - name: Build
         run: pnpm run build

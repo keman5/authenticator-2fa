@@ -1,61 +1,43 @@
-import { resolve } from 'node:path'
-import { defineConfig } from 'vitest/config'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
-import tailwindcss from '@tailwindcss/vite'
-import { normalizePath, type Plugin } from 'vite'
-
-const contentScriptEntries = {
-  codePaster: resolve(__dirname, 'src/content/codePaster.ts'),
-  pageScanner: resolve(__dirname, 'src/content/pageScanner.ts'),
-}
-const wrappedContentScriptEntryIds = new Set(Object.values(contentScriptEntries).map(normalizePath))
-
+import { resolve } from "node:path";
+import { defineConfig } from "vitest/config";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
-  plugins: [tailwindcss(), svelte(), wrapContentScriptEntries()],
-  publicDir: 'assets/extension',
+  plugins: [
+    tailwindcss(),
+    svelte(),
+    {
+      name: "isolated-injection",
+      apply: "build",
+      renderChunk(code, chunk) {
+        if (chunk.name !== "injected") return;
+        if (
+          chunk.imports.length ||
+          chunk.exports.length ||
+          chunk.dynamicImports.length
+        )
+          this.error("Injected script must be standalone");
+        return { code: `(()=>{${code}\n})();`, map: null };
+      },
+    },
+  ],
+  publicDir: "assets/extension",
   build: {
-    // Extension module imports cannot reuse document preloads across script worlds.
-    modulePreload: false,
-    outDir: 'dist/app',
+    outDir: "dist/web",
     emptyOutDir: true,
+    modulePreload: false,
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'index.html'),
-        background: resolve(__dirname, 'src/background.ts'),
-        ...contentScriptEntries,
+        index: resolve(import.meta.dirname, "index.html"),
+        worker: resolve(import.meta.dirname, "src/worker.ts"),
+        injected: resolve(import.meta.dirname, "src/injected.ts"),
       },
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        entryFileNames: "assets/[name].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
       },
     },
   },
-  test: {
-    environment: 'node',
-    fsModuleCache: true,
-    include: ['test/**/*.test.ts'],
-  },
-})
-
-function wrapContentScriptEntries(): Plugin {
-  return {
-    name: 'auth-wrap-content-script-entries',
-    apply: 'build',
-    renderChunk(code, chunk) {
-      const entry = chunk.facadeModuleId && normalizePath(chunk.facadeModuleId)
-      if (!entry || !wrappedContentScriptEntryIds.has(entry)) {
-        return null
-      }
-
-      if (chunk.imports.length > 0 || chunk.dynamicImports.length > 0 || chunk.exports.length > 0) {
-        this.error(`Content script ${chunk.name} must be self-contained`)
-      }
-
-      return {
-        code: `(() => {\n${code}\n})();\n`,
-        map: null,
-      }
-    },
-  }
-}
+  test: { environment: "node", include: ["test/**/*.test.ts"] },
+});

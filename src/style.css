@@ -1,0 +1,282 @@
+@import "tailwindcss" source(none);
+@source "./";
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark --prefersdark;
+  logs: false;
+}
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-primary: oklch(43% 0.085 170);
+  --color-primary-content: oklch(99% 0.005 170);
+  --radius-field: 0.65rem;
+  --radius-box: 1rem;
+}
+[data-theme="dark"] {
+  --color-primary: oklch(77% 0.1 165);
+  --color-primary-content: oklch(22% 0.03 165);
+}
+body {
+  margin: 0;
+  min-width: 340px;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+.shell {
+  width: 100%;
+  max-width: 600px;
+  min-height: 580px;
+  margin: auto;
+  background: var(--color-base-100);
+  padding-bottom: 68px;
+  position: relative;
+}
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid
+    color-mix(in oklab, var(--color-base-content) 12%, transparent);
+}
+.brand-mark {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  width: 40px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: 29px;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  opacity: 0.6;
+}
+.masthead h1 {
+  font-size: 23px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+main {
+  padding: 24px;
+}
+h2 {
+  font-size: 18px;
+  font-weight: 650;
+}
+h3 {
+  font-weight: 600;
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.count {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.5;
+  margin-inline-start: 6px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 550;
+}
+.input,
+.select,
+.textarea {
+  font-size: 14px;
+  font-weight: 400;
+}
+.hint {
+  font-size: 12px;
+  line-height: 1.65;
+  opacity: 0.65;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 13px;
+}
+hr {
+  border-color: var(--color-base-300);
+  margin: 8px 0;
+}
+.accounts {
+  list-style: none;
+  margin-top: 14px;
+}
+.account {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.account-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.monogram {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--color-base-200);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 650;
+}
+.account-label {
+  flex: 1;
+  min-width: 0;
+}
+.account-label h3 {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.account-label p {
+  font-size: 11px;
+  opacity: 0.55;
+  overflow-wrap: anywhere;
+}
+.code-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0 7px;
+  padding-inline-start: 42px;
+}
+.code-button {
+  font:
+    500 29px/1.4 ui-monospace,
+    SFMono-Regular,
+    monospace;
+  letter-spacing: 0.065em;
+  color: var(--color-primary);
+  text-align: start;
+  border-radius: 5px;
+}
+.code-button:hover {
+  background: var(--color-base-200);
+}
+.timer {
+  font:
+    12px ui-monospace,
+    monospace;
+  opacity: 0.6;
+}
+.timer span {
+  font-size: 10px;
+  margin-inline-start: 2px;
+}
+.progress {
+  display: block;
+  margin-inline-start: 42px;
+  width: calc(100% - 42px);
+  opacity: 0.6;
+}
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  z-index: 8;
+  background: var(--color-base-100);
+  border-top: 1px solid var(--color-base-300);
+  padding: 8px 16px 12px;
+  gap: 8px;
+}
+.bottom-nav button {
+  flex: 1;
+  border-radius: 9px;
+  font-size: 12px;
+  min-height: 40px;
+  opacity: 0.55;
+}
+.bottom-nav button.active {
+  background: var(--color-base-200);
+  color: var(--color-primary);
+  opacity: 1;
+  font-weight: 650;
+}
+.empty {
+  text-align: center;
+  padding: 50px 15px;
+}
+.empty-glyph {
+  font-size: 36px;
+  color: var(--color-primary);
+  margin-bottom: 14px;
+}
+.gate {
+  padding-top: 65px;
+  max-width: 360px;
+  margin: auto;
+}
+.gate h2 {
+  margin: 18px 0 24px;
+}
+.gate-symbol {
+  font-size: 40px;
+  color: var(--color-primary);
+}
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 20px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  background: var(--color-base-200);
+}
+.toast {
+  bottom: 70px;
+  z-index: 30;
+}
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+@media (min-width: 650px) {
+  .shell {
+    margin-top: 30px;
+    min-height: calc(100vh - 60px);
+    border-radius: 16px;
+    overflow: clip;
+  }
+  .bottom-nav {
+    bottom: 0;
+  }
+  .gate {
+    min-height: 450px;
+  }
+}

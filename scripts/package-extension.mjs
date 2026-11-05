@@ -1,56 +1,75 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
-import { zipSync } from 'fflate';
-
-const allTargets = ['chrome', 'edge', 'firefox', 'safari'];
-const targets = process.argv.slice(2);
-const selectedTargets = targets.length ? targets : allTargets;
-const packageJson = JSON.parse(await readFile('package.json', 'utf8'));
-const tagName = process.env.TAG_NAME ?? `v${packageJson.version}`;
-const outputDir = process.env.ARTIFACT_DIR ?? 'artifacts';
-
-await mkdir(outputDir, { recursive: true });
-
-for (const target of selectedTargets) {
-  if (!allTargets.includes(target)) {
-    throw new Error(`Unknown extension target: ${target}`);
-  }
-
-  const sourceDir = join('dist', target);
-  const outputFile = join(outputDir, `authenticator-2fa-${target}-${tagName}.zip`);
-  await createZip(sourceDir, outputFile);
-  console.log(`Created ${outputFile}`);
-}
-
-async function createZip(sourceDir, outputFile) {
-  const files = (await listFiles(sourceDir))
-    .map((file) => ({
-      path: file,
-      name: relative(sourceDir, file).replaceAll('\\', '/'),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const entries = {};
-
-  for (const file of files) {
-    entries[file.name] = await readFile(file.path);
-  }
-
-  await writeFile(outputFile, zipSync(entries, { level: 6 }));
-}
-
-async function listFiles(dir) {
-  const entries = await readdir(dir);
-  const files = [];
-
-  for (const entry of entries) {
-    const path = join(dir, entry);
-    const info = await stat(path);
-    if (info.isDirectory()) {
-      files.push(...(await listFiles(path)));
-    } else {
-      files.push(path);
+import {
+  readdir,
+  readFile,
+  writeFile,
+  mkdir,
+  access,
+  stat,
+} from "node:fs/promises";
+import { zipSync } from "fflate";
+import { join } from "node:path";
+const { version } = JSON.parse(await readFile("package.json", "utf8"));
+await mkdir("artifacts", { recursive: true });
+async function tree(root, relative = "", skip = new Set()) {
+  const result = {};
+  for (const item of await readdir(join(root, relative), {
+    withFileTypes: true,
+  })) {
+    if (skip.has(item.name) || item.isSymbolicLink()) continue;
+    const path = join(relative, item.name);
+    if (item.isDirectory()) Object.assign(result, await tree(root, path, skip));
+    else {
+      const file = join(root, path);
+      result[path] = [
+        new Uint8Array(await readFile(file)),
+        { os: 3, attrs: (await stat(file)).mode << 16 },
+      ];
     }
   }
+  return result;
+}
+for (const target of ["chrome", "edge", "firefox", "safari"])
+  await writeFile(
+    `artifacts/authenticator-workspace-${version}-${target}.zip`,
+    zipSync(await tree(`dist/${target}`), { level: 9 }),
+  );
+const sources = {};
+for (const directory of [
+  "src",
+  "test",
+  "scripts",
+  "assets",
+  "docs",
+  "native",
+]) {
+  Object.assign(sources, await tree(".", directory));
+}
+for (const name of [
+  "package.json",
+  "pnpm-lock.yaml",
+  "build.sh",
+  "index.html",
+  "vite.config.ts",
+  "svelte.config.js",
+  "tsconfig.json",
+  "tsconfig.test.json",
+  "README.md",
+  "LICENSE",
+]) {
+  sources[name] = new Uint8Array(await readFile(name));
+}
+await writeFile(
+  `artifacts/authenticator-workspace-${version}-source.zip`,
+  zipSync(sources, { level: 9 }),
+);
+console.log("Extension and review-source archives written to artifacts/.");
 
-  return files;
+try {
+  await access("dist/touch-id/Authenticator Touch ID.app");
+  await writeFile(
+    `artifacts/authenticator-workspace-${version}-touch-id-macos.zip`,
+    zipSync(await tree("dist/touch-id"), { level: 9 }),
+  );
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
 }

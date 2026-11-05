@@ -1,20 +1,20 @@
 {
-  "extensionName": {
-    "message": "প্রমাণীকরণকারী - 2FA"
+  "name": {
+    "message": "Authenticator - 2FA"
   },
-  "extensionShortName": {
-    "message": "2FA Auth"
+  "shortName": {
+    "message": "2FA Codes"
   },
-  "extensionDescription": {
-    "message": "QR আমদানি ও ঐচ্ছিক পাসওয়ার্ড সুরক্ষাসহ 2FA কোড।"
+  "description": {
+    "message": "একবারের কোড, ঐচ্ছিক স্ক্রিন লক ও এনক্রিপ্ট করা ব্যাকআপ।"
   },
-  "actionTitle": {
-    "message": "প্রমাণীকরণকারী - 2FA খুলুন"
+  "title": {
+    "message": "Authenticator - 2FA"
   },
-  "commandOpenPopup": {
-    "message": "পপআপ খুলুন"
+  "normal": {
+    "message": "লক দিয়ে খুলুন"
   },
-  "commandOpenWithoutPassword": {
-    "message": "পাসওয়ার্ড ছাড়া খুলুন"
+  "direct": {
+    "message": "সরাসরি খুলুন"
   }
 }

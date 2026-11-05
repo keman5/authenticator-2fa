@@ -1,23 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")"
-if [[ "${1:-web}" != web && "${1:-web}" != safari ]]; then
-  echo 'Usage: ./build.sh [web|safari]' >&2
-  exit 1
-fi
-if command -v go >/dev/null 2>&1; then
-  go clean -cache
-fi
+if command -v go >/dev/null 2>&1; then go clean -cache; fi
 rm -rf .artifacts
-pnpm run build
-if [[ "${1:-web}" == safari ]]; then
-  xcrun safari-web-extension-converter dist/safari \
-    --project-location dist/safari-project --app-name 'Authenticator - 2FA' \
-    --bundle-identifier local.Authenticator---2FA --macos-only --swift \
-    --copy-resources --no-open --no-prompt --force
-  xcodebuild -project 'dist/safari-project/Authenticator - 2FA/Authenticator - 2FA.xcodeproj' -scheme 'Authenticator - 2FA' \
-    -configuration Release -derivedDataPath dist/safari-native \
-    MACOSX_DEPLOYMENT_TARGET=13.3 ONLY_ACTIVE_ARCH=NO 'ARCHS=arm64 x86_64' CODE_SIGNING_ALLOWED=NO build
-  safari_apps=(dist/safari-native/Build/Products/Release/*.app)
-  test -d "${safari_apps[0]}/Contents/PlugIns"
-fi
+pnpm exec vite build
+node scripts/build-extension.mjs
+node scripts/verify-build.mjs
+case "${1:-}" in
+  package) node scripts/package-extension.mjs ;;
+  native) bash native/build.sh ;;
+  safari)
+    app_name='Authenticator Workspace'
+    rm -rf dist/safari-project dist/safari-native
+    xcrun safari-web-extension-converter dist/safari --project-location dist/safari-project --app-name "$app_name" --bundle-identifier local.Authenticator-Workspace --swift --macos-only --no-prompt --no-open
+    cat native/TouchID.swift native/SafariWebExtensionHandler.swift > "dist/safari-project/$app_name/$app_name Extension/SafariWebExtensionHandler.swift"
+    xcodebuild -project "dist/safari-project/$app_name/$app_name.xcodeproj" -scheme "$app_name" -configuration Release -derivedDataPath dist/safari-native MACOSX_DEPLOYMENT_TARGET=13.3 ONLY_ACTIVE_ARCH=NO 'ARCHS=arm64 x86_64' CODE_SIGNING_ALLOWED=NO build
+    rm -rf dist/safari-native/Build/Intermediates.noindex dist/safari-native/ModuleCache.noindex dist/safari-native/SDKStatCaches.noindex dist/safari-native/SDKExplicitPrecompiledModules dist/safari-native/Index.noindex dist/safari-native/Logs
+    ;;
+  '') ;;
+  *) echo 'Usage: ./build.sh [package|safari|native]' >&2; exit 2 ;;
+esac

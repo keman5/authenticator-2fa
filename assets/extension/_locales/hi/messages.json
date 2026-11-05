@@ -1,20 +1,20 @@
 {
-  "extensionName": {
-    "message": "प्रमाणक - 2FA"
+  "name": {
+    "message": "Authenticator - 2FA"
   },
-  "extensionShortName": {
-    "message": "प्रमाणक"
+  "shortName": {
+    "message": "2FA Codes"
   },
-  "extensionDescription": {
-    "message": "QR आयात और वैकल्पिक पासवर्ड सुरक्षा वाले 2FA कोड।"
+  "description": {
+    "message": "एक बार के कोड, वैकल्पिक स्क्रीन लॉक और एन्क्रिप्टेड बैकअप।"
   },
-  "actionTitle": {
-    "message": "प्रमाणक - 2FA खोलें"
+  "title": {
+    "message": "Authenticator - 2FA"
   },
-  "commandOpenPopup": {
-    "message": "पॉपअप खोलें"
+  "normal": {
+    "message": "लॉक के साथ खोलें"
   },
-  "commandOpenWithoutPassword": {
-    "message": "बिना पासवर्ड खोलें"
+  "direct": {
+    "message": "सीधे खोलें"
   }
 }
