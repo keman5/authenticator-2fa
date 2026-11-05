@@ -128,6 +128,25 @@ try {
     () => page.evaluate("document.querySelector('nav')!==null"),
     "first screen",
   );
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 360,
+    height: 580,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await page.evaluate("document.documentElement.classList.add('extension-popup')");
+  assert.equal(
+    await page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth"),
+    true,
+    "popup fits a narrowed content viewport",
+  );
+  await page.evaluate("document.documentElement.classList.remove('extension-popup')");
+  await page.call("Emulation.setDeviceMetricsOverride", {
+    width: 380,
+    height: 640,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
   const click = (label) =>
     page.evaluate(
       `(()=>{const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!button)throw Error('Missing button '+${JSON.stringify(label)});button.click();})()`,

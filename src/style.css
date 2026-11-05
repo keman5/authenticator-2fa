@@ -23,6 +23,10 @@ body {
   background: var(--color-base-200);
   color: var(--color-base-content);
 }
+.extension-popup body {
+  width: 380px;
+  max-width: 100%;
+}
 button,
 input,
 select,

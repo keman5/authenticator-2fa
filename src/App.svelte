@@ -28,7 +28,7 @@
     transaction,
   } from "./platform/repository";
   import { synchronize } from "./platform/sync";
-  import { request, sourceWindow, takeQuickEntry } from "./platform/browser";
+  import { request, sourceWindow, takeQuickEntry, tryFill } from "./platform/browser";
   import { translate, type MessageKey } from "./lib/i18n/messages";
   import CredentialEditor from "./ui/CredentialEditor.svelte";
   import TransferView from "./ui/TransferView.svelte";
@@ -195,6 +195,7 @@
     return `${t("imported")}: ${result.result.added} · ${t("skipped")}: ${result.result.skipped}`;
   }
   async function copy(item: Credential) {
+    notice = "";
     await attempt(async () => {
       let code: string;
       if (item.mode === "hotp") {
@@ -225,11 +226,8 @@
       }
       notice = t("copied");
       if (space.preferences.paste) {
-        const filled = await request<boolean>("fill", {
-          code,
-          source: sourceWindow(),
-        });
-        if (!filled) throw new InputError("unavailable");
+        const filled = await tryFill(code, sourceWindow());
+        if (!filled) notice = `${t("copied")} · ${t("autoPaste")}: ${t("error_unavailable")}`;
       }
     });
   }

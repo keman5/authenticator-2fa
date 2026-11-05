@@ -20,6 +20,35 @@ export function sourceWindow(): number | undefined {
   const number = Number(value);
   return Number.isSafeInteger(number) && number >= 0 ? number : undefined;
 }
+export function requiresFileWindow(isPopup: boolean): boolean {
+  return isPopup;
+}
+export function fileWindowBounds(
+  x: number,
+  y: number,
+  screen: Pick<Screen, "availWidth" | "availHeight"> & { availLeft?: number; availTop?: number },
+  browser?: { left?: number; top?: number; width?: number },
+) {
+  const left = screen.availLeft ?? 0;
+  const top = screen.availTop ?? 0;
+  const width = Math.min(380, screen.availWidth);
+  if (browser?.left !== undefined && browser.top !== undefined && browser.width !== undefined) {
+    const windowTop = Math.round(Math.max(top, Math.min(browser.top + 85, top + screen.availHeight - 1)));
+    return {
+      left: Math.round(Math.max(left, Math.min(browser.left + browser.width - width, left + screen.availWidth - width))),
+      top: windowTop,
+      width,
+      height: Math.min(720, top + screen.availHeight - windowTop),
+    };
+  }
+  const height = Math.min(720, screen.availHeight);
+  return {
+    left: Math.round(Math.max(left, Math.min(x, left + screen.availWidth - width))),
+    top: Math.round(Math.max(top, Math.min(y, top + screen.availHeight - height))),
+    width,
+    height,
+  };
+}
 export async function request<T>(
   kind: string,
   payload: Record<string, unknown> = {},
@@ -39,6 +68,13 @@ export async function request<T>(
     ),
   );
 }
+export async function tryFill(code: string, source?: number): Promise<boolean> {
+  try {
+    return await request<boolean>("fill", { code, source });
+  } catch {
+    return false;
+  }
+}
 export async function openFileWindow(): Promise<void> {
   if (
     typeof chrome === "undefined" ||
@@ -46,6 +82,12 @@ export async function openFileWindow(): Promise<void> {
   )
     return;
   const current = await chrome.windows.getCurrent();
+  const bounds = fileWindowBounds(
+    window.screenX,
+    window.screenY,
+    window.screen,
+    location.protocol === "moz-extension:" ? current : undefined,
+  );
   const url = new URL(chrome.runtime.getURL("index.html"));
   url.searchParams.set("view", "data");
   if (current.id !== undefined)
@@ -53,8 +95,7 @@ export async function openFileWindow(): Promise<void> {
   const created = await chrome.windows.create({
     url: url.href,
     type: "popup",
-    width: 440,
-    height: 720,
+    ...bounds,
   });
   if (created?.id !== undefined) window.close();
 }

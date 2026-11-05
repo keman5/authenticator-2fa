@@ -11,7 +11,7 @@
     isProtectedBackup,
     openBackup,
   } from "../domain/sealing";
-  import { openFileWindow } from "../platform/browser";
+  import { openFileWindow, requiresFileWindow } from "../platform/browser";
   import type { MessageKey } from "../lib/i18n/messages";
   let {
     space,
@@ -146,7 +146,9 @@
         onclick={(event) => {
           if (
             typeof chrome !== "undefined" &&
-            chrome.extension?.getViews?.({ type: "popup" }).includes(window)
+            requiresFileWindow(
+              chrome.extension?.getViews?.({ type: "popup" }).includes(window) ?? false,
+            )
           ) {
             event.preventDefault();
             void run(openFileWindow);

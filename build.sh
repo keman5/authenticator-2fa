@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 if command -v go >/dev/null 2>&1; then go clean -cache; fi
 rm -rf .artifacts
+node -e 'const fs = require("fs"); const file = "package.json"; const data = JSON.parse(fs.readFileSync(file, "utf8")); const parts = data.version.split("."); if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) throw new Error("Expected a numeric major.minor.patch version"); parts[2] = String(Number(parts[2]) + 1); data.version = parts.join("."); fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");'
 pnpm exec vite build
 node scripts/build-extension.mjs
 node scripts/verify-build.mjs

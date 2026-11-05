@@ -18,7 +18,7 @@ import {
   synchronize,
   syncNamespace,
 } from "../src/platform/sync";
-import { shortcutsPage, takeQuickEntry } from "../src/platform/browser";
+import { fileWindowBounds, requiresFileWindow, shortcutsPage, takeQuickEntry, tryFill } from "../src/platform/browser";
 import { languages, messages, translate } from "../src/lib/i18n/messages";
 let local: Record<string, unknown>,
   cloud: Record<string, unknown>,
@@ -65,6 +65,31 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
+it("reports optional page filling separately from a successful copy", async () => {
+  const sendMessage = vi.fn((_message, reply) => reply({ ok: true, value: true }));
+  Object.assign(chrome.runtime, { sendMessage });
+  await expect(tryFill("123456", 2)).resolves.toBe(true);
+  sendMessage.mockImplementation((_message, reply) => reply({ ok: true, value: false }));
+  await expect(tryFill("123456", 2)).resolves.toBe(false);
+  sendMessage.mockImplementation((_message, reply) => reply({ ok: false, error: "injection failed" }));
+  await expect(tryFill("123456", 2)).resolves.toBe(false);
+});
+it("opens a persistent file window for toolbar popups in Firefox and Chromium", () => {
+  expect(requiresFileWindow(true)).toBe(true);
+  expect(requiresFileWindow(false)).toBe(false);
+});
+it("positions the import window at the popup and keeps it within the screen", () => {
+  expect(fileWindowBounds(1200, 80, { availLeft: 0, availTop: 25, availWidth: 1440, availHeight: 875 }))
+    .toEqual({ left: 1060, top: 80, width: 380, height: 720 });
+  expect(fileWindowBounds(-1100, 800, { availLeft: -1440, availTop: 0, availWidth: 1440, availHeight: 900 }))
+    .toEqual({ left: -1100, top: 180, width: 380, height: 720 });
+});
+it("positions the Firefox import window at the browser's upper-right below the toolbar", () => {
+  expect(fileWindowBounds(900, 70, { availLeft: 0, availTop: 25, availWidth: 1440, availHeight: 875 }, { left: 100, top: 50, width: 1000 }))
+    .toEqual({ left: 720, top: 135, width: 380, height: 720 });
+  expect(fileWindowBounds(-1100, 50, { availLeft: -1440, availTop: 0, availWidth: 1440, availHeight: 600 }, { left: -1400, top: 20, width: 1200 }))
+    .toEqual({ left: -580, top: 105, width: 380, height: 495 });
+});
 const item = async (login = "alice") =>
   identify(
     validateCredential({
