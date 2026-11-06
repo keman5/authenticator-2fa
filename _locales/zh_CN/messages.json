@@ -1,0 +1,8 @@
+{
+ "extDesc": {
+  "message": "本地两步验证（TOTP）管理器：盾牌钥匙孔标志，界面自动跟随系统语言，支持扫码添加、浏览器账号同步与网页填充。"
+ },
+ "cmdOpen": {
+  "message": "打开 Authenticator - 2FA"
+ }
+}

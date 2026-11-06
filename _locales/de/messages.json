@@ -1,0 +1,8 @@
+{
+ "extDesc": {
+  "message": "Lokaler Zwei-Faktor-Manager (TOTP): Schild-Schlüsselloch-Logo, Oberfläche folgt automatisch der Systemsprache, mit Scan-Hinzufügen, Browserkonto-Sync und Ausfüllen auf Webseiten."
+ },
+ "cmdOpen": {
+  "message": "Authenticator - 2FA öffnen"
+ }
+}

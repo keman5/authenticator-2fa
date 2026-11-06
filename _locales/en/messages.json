@@ -1,0 +1,8 @@
+{
+ "extDesc": {
+  "message": "Local two-factor (TOTP) manager: shield-keyhole logo, UI follows your system language automatically, with scan-to-add, browser-account sync and page fill."
+ },
+ "cmdOpen": {
+  "message": "Open Authenticator - 2FA"
+ }
+}

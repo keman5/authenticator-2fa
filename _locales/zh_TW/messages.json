@@ -1,0 +1,8 @@
+{
+ "extDesc": {
+  "message": "本地兩步驗證（TOTP）管理器：盾牌鑰匙孔標誌，介面自動跟隨系統語言，支援掃碼新增、瀏覽器帳號同步與網頁填入。"
+ },
+ "cmdOpen": {
+  "message": "開啟 Authenticator - 2FA"
+ }
+}

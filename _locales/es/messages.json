@@ -1,0 +1,8 @@
+{
+ "extDesc": {
+  "message": "Gestor local de verificación en dos pasos (TOTP): logotipo de escudo con ojo de cerradura, interfaz que sigue automáticamente el idioma del sistema, con adición por escaneo, sincronización con la cuenta del navegador y relleno en páginas web."
+ },
+ "cmdOpen": {
+  "message": "Abrir Authenticator - 2FA"
+ }
+}

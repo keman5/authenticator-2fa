@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Authenticator - 2FA</title>
+<link rel="stylesheet" href="popup.css"/>
+<style>html,body{margin:0;padding:0}.pui{height:600px}</style>
+</head>
+<body>
+<div class="pui" id="popup" data-theme="light">
+  <!-- top bar -->
+  <div class="p-head">
+    <div class="brand-logo" role="img" aria-label="2FA 标志 · 盾牌钥匙孔，外围 30 秒倒计时圆圈" data-i18n-aria="brandAria">
+      <svg width="30" height="30" viewBox="-4 -4 56 56" aria-hidden="true"><defs><linearGradient id="lgTop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D2F52"/><stop offset="1" stop-color="#0B1526"/></linearGradient></defs><circle cx="24" cy="24" r="19.6" fill="url(#lgTop)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#DADCE0" stroke-width="3.8"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#EA4335" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-1.30" transform="rotate(-90 24 24)" id="logoSeg0"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#FBBC05" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-35.07" transform="rotate(-90 24 24)" id="logoSeg1"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#4285F4" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-68.84" transform="rotate(-90 24 24)" id="logoSeg2"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#34A853" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-102.61" transform="rotate(-90 24 24)" id="logoSeg3"/><path d="M24 14.8 31.8 17.4 V23.1 C31.8 28.3 28.8 31.6 24 33.6 C19.2 31.6 16.2 28.3 16.2 23.1 V17.4 Z" fill="#FFFFFF"/><circle cx="24" cy="22.4" r="2.8" fill="#0E1B30"/><path d="M23 24.2h2l.7 4.8h-3.4Z" fill="#0E1B30"/></svg>
+    </div>
+    <div class="search" id="searchWrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="searchInput" type="text" placeholder="搜索账号" autocomplete="off" aria-label="搜索账号" data-i18n-ph="searchPh" data-i18n-aria="searchPh"/>
+      <button class="clear" id="searchClear" aria-label="清除搜索" data-i18n-aria="clearSearch">×</button>
+    </div>
+    <button class="icon-btn" id="lockBtn" aria-label="锁定" data-i18n-aria="lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+    <button class="add-btn" id="addBtn" aria-label="添加账号" data-i18n-aria="addAccount"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+
+  <div class="p-body" id="pBody">
+    <!-- CODES -->
+    <div class="view active" id="view-codes">
+      <div class="chips" id="chips">
+        <button class="chip active" data-filter="all"><span data-i18n="chipAll">全部</span><span id="acctCount">0</span></button>
+        <button class="chip" data-filter="site"><span data-i18n="chipSite">当前网站</span> · GitHub</button>
+        <button class="chip" data-filter="fav"><span data-i18n="chipFav">常用</span></button>
+      </div>
+      <div id="acctList"></div>
+      <div class="fold-bar" id="foldBar" style="display:none">
+        <button class="fold-btn" id="expandBtn" aria-expanded="false"><span id="expandBtnText">展开全部账号</span></button>
+      </div>
+      <div class="empty" id="emptyState"><span data-i18n="empty1">没有匹配的账号</span><br/><span data-i18n="empty2">换个关键词试试，或添加一个新账号。</span></div>
+    </div>
+
+    <!-- DATA -->
+    <div class="view" id="view-data">
+      <div class="row-title"><h2 data-i18n="dataTitle">数据</h2><span class="count" data-i18n="dataSub">导入 · 导出 · 备份</span></div>
+      <div class="section-label" data-i18n="importSec">导入</div>
+      <div class="field"><label for="importText" data-i18n="importTextLabel">粘贴 otpauth 链接或 JSON 备份</label><textarea id="importText" placeholder="otpauth://totp/… 或粘贴备份 JSON" data-i18n-ph="importTextPh"></textarea></div>
+      <div class="field"><label for="importPwd" data-i18n="importPwdLabel">备份密码（如备份已加密）</label><input type="password" id="importPwd" placeholder="没有密码可留空" autocomplete="off" data-i18n-ph="importPwdPh"/></div>
+      <div class="btn-row">
+        <button class="btn-primary" id="importBtn" disabled data-i18n="importBtn">导入</button>
+        <button class="btn-soft" id="pickFileBtn" data-i18n="pickFile">选择备份或二维码图片</button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json,.txt,.2fa,image/*" hidden/>
+      <div class="err-text" id="importMsg"></div>
+
+      <div class="section-label" data-i18n="exportSec">导出</div>
+      <p class="desc" style="margin-bottom:10px" data-i18n="exportDesc">导出文件包含全部账号密钥。选择加密导出时需设置备份密码，未加密文件请妥善保管。</p>
+      <div class="field"><label data-i18n="exportFmtLabel">导出格式</label>
+        <div class="dd" data-dd="exportFmt">
+          <button class="dd-btn" type="button"><span>加密备份文件（.2fa）</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="dd-menu">
+            <button type="button" data-val="enc" class="sel" data-i18n="fmtEnc">加密备份文件（.2fa）</button>
+            <button type="button" data-val="json" data-i18n="fmtJson">JSON（未加密）</button>
+            <button type="button" data-val="txt" data-i18n="fmtTxt">otpauth 链接列表（.txt）</button>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="exportBtn" data-i18n="exportBtn">导出备份</button>
+        <button class="btn-soft" id="migQrBtn" data-i18n="migQr">批量迁移二维码</button>
+        <span class="last-backup" id="lastBackup">最后备份：尚未备份</span>
+      </div>
+
+      <div class="section-label" data-i18n="dangerSec">危险区</div>
+      <div class="list-card">
+        <button class="list-row" id="wipeBtn"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6"/></svg></span><span class="tx"><b style="color:var(--red)" data-i18n="wipe">清除全部数据</b><small data-i18n="wipeDesc">删除此设备上的所有账号与设置，不可撤销</small></span><span class="chev">›</span></button>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="row-title"><h2 data-i18n="settingsTitle">设置</h2></div>
+      <div class="section-label" data-i18n="generalSec">通用</div>
+      <div class="list-card">
+        <div class="list-row"><span class="tx"><b data-i18n="langName">语言</b><small data-i18n="langDesc">默认跟随系统 / 浏览器语言，可手动指定</small></span>
+          <div class="dd" data-dd="lang"><button class="dd-btn" type="button"><span>自动（跟随系统）</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="auto" class="sel" data-i18n="langAuto">自动（跟随系统）</button><button type="button" data-val="zh-CN">简体中文</button><button type="button" data-val="zh-TW">繁體中文</button><button type="button" data-val="en">English</button><button type="button" data-val="ja">日本語</button><button type="button" data-val="ko">한국어</button><button type="button" data-val="de">Deutsch</button><button type="button" data-val="es">Español</button></div></div>
+        </div>
+        <div class="list-row"><span class="tx"><b data-i18n="appearance">外观</b><small data-i18n="appearanceDesc">跟随浏览器与系统主题</small></span>
+          <div class="dd" data-dd="theme"><button class="dd-btn" type="button"><span>跟随系统</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="system" class="sel" data-i18n="themeSystem">跟随系统</button><button type="button" data-val="light" data-i18n="themeLight">浅色</button><button type="button" data-val="dark" data-i18n="themeDark">深色</button></div></div>
+        </div>
+      </div>
+      <div class="section-label" data-i18n="behaviorSec">验证码行为</div>
+      <div class="list-card">
+        <div class="list-row"><span class="tx"><b data-i18n="hideName">隐藏验证码，点击复制</b><small data-i18n="hideDesc">默认以圆点显示，点击卡片复制</small></span><button class="switch" id="swHide" aria-label="隐藏验证码，点击复制" data-i18n-aria="hideName"></button></div>
+        <div class="list-row"><span class="tx"><b data-i18n="secondsName">显示剩余秒数</b><small data-i18n="secondsDesc">在每个验证码旁显示倒计时</small></span><button class="switch on" id="swSeconds" aria-label="显示剩余秒数" data-i18n-aria="secondsName"></button></div>
+        <div class="list-row"><span class="tx"><b data-i18n="autofillName">自动填写当前网页</b><small data-i18n="autofillDesc">匹配到账号时一键填入输入框</small></span><button class="switch on" id="swAutofill" aria-label="自动填写当前网页" data-i18n-aria="autofillName"></button></div>
+        <div class="list-row"><span class="tx"><b data-i18n="priorityName">优先显示匹配网站的账号</b><small data-i18n="priorityDesc">打开时把当前网站账号排在前面</small></span><button class="switch on" id="swPriority" aria-label="优先显示匹配网站的账号" data-i18n-aria="priorityName"></button></div>
+        <div class="list-row"><span class="tx"><b data-i18n="foldName">「全部」默认折叠</b><small data-i18n="foldDesc">全部里先只显示当前网站账号，其余点下方展开查看</small></span><button class="switch on" id="swFold" aria-label="「全部」默认折叠" data-i18n-aria="foldName"></button></div>
+        <div class="list-row"><span class="ic" aria-hidden="true"><svg width="26" height="26" viewBox="-4 -4 56 56"><defs><linearGradient id="lgSet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D2F52"/><stop offset="1" stop-color="#0B1526"/></linearGradient></defs><circle cx="24" cy="24" r="19.6" fill="url(#lgSet)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#DADCE0" stroke-width="3.8"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#EA4335" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-1.30" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#4285F4" stroke-width="3.8" stroke-dasharray="12.47 135.09" stroke-dashoffset="-68.84" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#FBBC05" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-35.07" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#34A853" stroke-width="3.8" stroke-dasharray="0 135.09" stroke-dashoffset="-102.61" transform="rotate(-90 24 24)"/><path d="M24 14.8 31.8 17.4 V23.1 C31.8 28.3 28.8 31.6 24 33.6 C19.2 31.6 16.2 28.3 16.2 23.1 V17.4 Z" fill="#FFFFFF"/><circle cx="24" cy="22.4" r="2.8" fill="#0E1B30"/><path d="M23 24.2h2l.7 4.8h-3.4Z" fill="#0E1B30"/></svg></span><span class="tx"><b data-i18n="enhanceName">网页输入框增强菜单</b><small data-i18n="enhanceDesc">在网页验证码输入框外部右上角显示标志角标，输入框被激活后才出现，悬停展开匹配账号菜单</small></span><button class="switch on" id="swEnhance" aria-label="网页输入框增强菜单" data-i18n-aria="enhanceName"></button></div>
+      </div>
+      <div class="section-label" data-i18n="securitySec">安全与同步</div>
+      <div class="list-card">
+        <button class="list-row" data-goto="password"><span class="tx"><b data-i18n="pwdName">界面密码</b><small data-i18n="pwdDesc">打开与填充前验证</small></span><span class="status-chip off" id="chipPwd">未设置</span><span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button class="list-row" data-goto="passkey"><span class="tx"><b data-i18n="passkeyName">Passkey 与快捷键</b><small data-i18n="passkeyDesc">通行密钥与快速填充</small></span><span class="status-chip" id="chipPasskey">已开启</span><span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <button class="list-row" data-goto="sync"><span class="tx"><b data-i18n="syncName">浏览器同步</b><small data-i18n="syncDesc">只走浏览器账号，无第三方服务器</small></span><span class="status-chip" id="chipSync">已连接</span><span class="chev"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6"/></svg></span></button>
+        <div class="list-row"><span class="tx"><b data-i18n="autolockName">自动锁定</b><small data-i18n="autolockDesc">无操作后自动锁定</small></span>
+          <div class="dd" data-dd="autolock"><button class="dd-btn" type="button"><span>5 分钟</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="0">立即</button><button type="button" data-val="1">1 分钟</button><button type="button" data-val="5" class="sel">5 分钟</button><button type="button" data-val="30">30 分钟</button><button type="button" data-val="-1">从不</button></div></div>
+        </div>
+      </div>
+      <div class="section-label" data-i18n="aboutSec">关于</div>
+      <div class="list-card">
+        <div class="list-row"><span class="tx"><b>Authenticator - 2FA</b><small data-i18n="versionLabel">版本 0.1</small></span></div>
+        <div class="list-row"><span class="tx"><b data-i18n="extIdName">扩展 ID</b><small id="extIdText">加载中…</small></span><button class="btn-ghost" id="copyExtId" data-i18n="copy">复制</button></div>
+      </div>
+    </div>
+
+    <!-- SUB: PASSWORD -->
+    <div class="view" id="view-password">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="pwdName">界面密码</h2></div>
+      <p class="desc" style="margin:6px 0 12px" data-i18n="pwdPageDesc">设置后，打开窗口和在网页填充验证码前都需要先验证。密码只存放在本机，不会上传。</p>
+      <div class="field"><label for="pwdNew" data-i18n="newPwd">新密码</label><input type="password" id="pwdNew" placeholder="至少 4 位" autocomplete="new-password" data-i18n-ph="atLeast4"/></div>
+      <div class="field"><label for="pwdConfirm" data-i18n="confirmPwd">再输入一次</label><input type="password" id="pwdConfirm" placeholder="确认新密码" autocomplete="new-password" data-i18n-ph="confirmPh"/></div>
+      <div class="btn-row"><button class="btn-primary" id="pwdSave" data-i18n="savePwd">保存密码</button><button class="btn-danger-soft" id="pwdRemove" style="display:none" data-i18n="removePwd">移除密码</button></div>
+      <div class="err-text" id="pwdMsg"></div>
+    </div>
+
+    <!-- SUB: PASSKEY -->
+    <div class="view" id="view-passkey">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="passkeyName">Passkey 与快捷键</h2></div>
+      <div class="section-label" data-i18n="passkeySec">通行密钥</div>
+      <div class="list-card">
+        <div class="list-row"><span class="tx"><b data-i18n="usePasskey">使用 Passkey 解锁</b><small data-i18n="usePasskeyDesc">解锁与填充前用通行密钥验证（WebAuthn）</small></span><button class="switch on" id="swPasskey" aria-label="使用 Passkey 解锁" data-i18n-aria="usePasskey"></button></div>
+        <div class="list-row"><span class="tx"><b id="passkeyStatus" data-i18n="pkNone">尚未注册 Passkey</b><small id="passkeyStatusDesc" data-i18n="pkNoneDesc">注册一个可发现的通行密钥（discoverable credential），由系统钥匙串 / 密码管理器保存；解锁时调用它验证，不用输密码</small></span><button class="btn-ghost" id="registerPasskeyBtn" data-i18n="register">注册</button></div>
+      </div>
+      <div class="err-text" id="passkeyMsg"></div>
+      <p class="desc" style="margin-top:10px" data-i18n="pkAbout">Passkey 是保存在设备或密码管理器里的通行密钥，可随 iCloud 钥匙串 / Google 密码管理器等同步到你的其他设备；验证在本机完成，插件拿不到私钥。</p>
+      <div class="section-label" data-i18n="shortcutsSec">快捷键</div>
+      <div class="list-card">
+        <div class="list-row"><span class="tx"><b data-i18n="openWindow">打开窗口</b></span><span class="row-val">⌥ + Shift + A</span></div>
+        <div class="list-row"><span class="tx"><b data-i18n="fillCurrent">填充当前网页</b></span><span class="row-val">⌥ + Shift + F</span></div>
+      </div>
+      <p class="desc" style="margin-top:12px" data-i18n="shortcutsNote">快捷键可在浏览器的扩展快捷键设置页中修改。</p>
+    </div>
+
+    <!-- SUB: SYNC -->
+    <div class="view" id="view-sync">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="syncName">浏览器同步</h2></div>
+      <div class="section-label" data-i18n="howSec">同步是怎么实现的</div>
+      <div class="how-card">
+        <div class="how-step"><span class="n">1</span><p data-i18n-html="how1"><b>本机加密</b>：账号库先用恢复密钥派生的密钥在本机加密，明文不出设备。</p></div>
+        <div class="how-step"><span class="n">2</span><p data-i18n-html="how2"><b>浏览器账号通道</b>：密文写入扩展同步存储（chrome.storage.sync），由浏览器随浏览器账号同步，插件没有自有服务器、不经过第三方。</p></div>
+        <div class="how-step"><span class="n">3</span><p data-i18n-html="how3"><b>恢复密钥解密</b>：新设备登录同一浏览器账号后自动拉取密文，凭恢复密钥才能解密。</p></div>
+        <p class="muted" style="margin-top:6px" data-i18n="howNote">同步存储有容量上限（Chrome 单项 8KB、总量约 100KB），账号较多时会分片写入；不同浏览器品牌之间不能互通。</p>
+      </div>
+
+      <div class="section-label" data-i18n="recoverySec">恢复密钥</div>
+      <div class="field"><label for="recoveryKey" data-i18n="recoveryKeyLabel">恢复密钥（新设备解密时需要）</label>
+        <div class="recovery-wrap">
+          <input type="password" id="recoveryKey" readonly value="K7Q2-9XMD-4T8R-W3ZP-6N5B-H2JA"/>
+          <button class="eye-btn" id="recoveryToggle" aria-label="显示恢复密钥" aria-pressed="false" data-i18n-aria="showKey">
+            <svg class="eye-on" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-off" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18M10.6 5.1A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.9A16.6 16.6 0 0 0 2 12s3.5 7 10 7c1.5 0 2.9-.3 4.1-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="btn-row"><button class="btn-soft" id="copyRecovery" style="flex:1" data-i18n="copyRecovery">复制恢复密钥</button></div>
+      <p class="muted" style="margin-top:6px" data-i18n="recoveryNote">默认掩码显示，点右侧图标可显示 / 隐藏。</p>
+
+      <div class="section-label" id="deviceLabel">已同步设备 · 3 台</div>
+      <div class="list-card" id="deviceList">
+        <div class="device-row" data-device="macbook">
+          <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg></span>
+          <span class="tx"><b>MacBook Pro <span class="this-tag" data-i18n="thisDevice">本机</span></b><small>Chrome · macOS — <span class="lsync dev-time" data-time="2026-11-06 00:12">上次同步 2026-11-06 00:12</span></small></span>
+        </div>
+        <div class="device-row" data-device="winpc">
+          <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span>
+          <span class="tx"><b>Windows 台式机</b><small>Edge · Windows — <span class="lsync" data-time="2026-11-05 22:47">上次同步 2026-11-05 22:47</span></small></span>
+          <button class="revoke-btn" data-revoke data-i18n="revoke">立即失效</button>
+        </div>
+        <div class="device-row" data-device="macmini">
+          <span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg></span>
+          <span class="tx"><b>Mac mini</b><small>Firefox · macOS — <span class="lsync" data-time="2026-11-04 09:15">上次同步 2026-11-04 09:15</span></small></span>
+          <button class="revoke-btn" data-revoke data-i18n="revoke">立即失效</button>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:6px" data-i18n="devicesNote">失效后，该设备下次联网同步时会被拒绝读取新数据，并轮换同步密钥。</p>
+
+      <div class="section-label" data-i18n="syncOpsSec">同步操作</div>
+      <div class="sync-panel">
+        <div class="btn-row">
+          <button class="btn-primary" id="syncNow" data-i18n="syncNow">立即同步</button>
+          <button class="btn-ghost" id="syncDisconnect" style="margin-left:auto;padding-right:0">断开连接</button>
+        </div>
+        <div class="sync-divider"></div>
+        <div class="sync-kv"><span class="k" data-i18n="kvLastSync">上次同步</span><span class="v" id="syncMetaTime">2026-11-06 00:12</span></div>
+        <div class="sync-kv"><span class="k" data-i18n="kvContent">同步内容</span><span class="v" id="syncMetaCount">7 个账号 · 设置</span></div>
+        <div class="sync-kv"><span class="k" data-i18n="kvChannel">同步通道</span><span class="v" data-i18n="kvChannelVal">浏览器账号（chrome.storage.sync）</span></div>
+        <div class="sync-kv"><span class="k" data-i18n="kvState">同步状态</span><span class="v" id="syncMetaState">已同步</span></div>
+      </div>
+    </div>
+
+    <!-- ADD -->
+    <div class="view" id="view-add">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="addTitle">添加账号</h2></div>
+      <div class="seg" id="addSeg">
+        <button data-mode="scan" class="active" data-i18n="segScan">扫码添加</button>
+        <button data-mode="manual" data-i18n="segManual">手动添加</button>
+      </div>
+      <div id="addScan">
+        <div class="scan-ways" id="scanWays">
+          <button class="scan-way" data-way="shot"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></svg><span data-i18n="wayShot">屏幕截图</span></button>
+          <button class="scan-way" data-way="upload"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span data-i18n="wayUpload">上传文件</span></button>
+          <button class="scan-way active" data-way="cam"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span data-i18n="wayCam">摄像头扫码</span></button>
+        </div>
+        <div class="scan-pane" data-pane="shot">
+          <p class="desc" style="margin-bottom:10px" data-i18n="shotDesc">截取屏幕画面后自动识别其中的二维码（调用浏览器屏幕共享）。</p>
+          <div class="btn-row"><button class="btn-primary" id="shotBtn" data-i18n="shotBtn">截取屏幕并识别</button></div>
+          <div class="shot-frame" id="shotFrame"><canvas id="shotCanvas" width="640" height="400"></canvas></div>
+          <div class="scan-msg" id="shotMsg"></div>
+        </div>
+        <div class="scan-pane" data-pane="upload">
+          <div class="drop-zone" id="dropZone"><span data-i18n="dropMain">点击选择二维码图片，或把图片拖到这里</span><br/><span class="muted" data-i18n="dropSub">支持 PNG / JPG / WebP，只在本机识别</span></div>
+          <input type="file" id="qrFileInput" accept="image/*" hidden/>
+          <div class="file-meta" id="fileMeta"></div>
+          <div class="scan-msg" id="uploadMsg"></div>
+        </div>
+        <div class="scan-pane active" data-pane="cam">
+          <div class="cam-frame">
+            <video id="camVideo" playsinline muted></video>
+            <div class="cam-placeholder" id="camPlaceholder"><span data-i18n="camPh1">摄像头未开启</span><br/><span data-i18n="camPh2">点下方按钮开启后，将二维码对准取景框</span></div>
+            <div class="scan-corners"><i></i><i></i><i></i><i></i></div>
+            <div class="scan-line" id="scanLine" style="display:none"></div>
+          </div>
+          <div class="btn-row" style="margin-top:10px"><button class="btn-primary" id="camBtn" data-i18n="camStart">开启摄像头</button><button class="btn-soft" id="camStop" style="display:none" data-i18n="camStop">关闭摄像头</button></div>
+          <div class="scan-msg" id="camMsg"></div>
+        </div>
+      </div>
+      <div id="addManual" style="display:none">
+        <div class="field"><label for="mName" data-i18n="mName">名称（网站或服务）</label><input type="text" id="mName" placeholder="例如 GitHub" data-i18n-ph="mNamePh"/></div>
+        <div class="field"><label for="mAcct" data-i18n="mAcct">账号</label><input type="text" id="mAcct" placeholder="例如 user@example.com" data-i18n-ph="mAcctPh"/></div>
+        <div class="field"><label for="mSecret" data-i18n="mSecret">密钥（Base32）</label><input type="text" id="mSecret" placeholder="例如 JBSWY3DPEHPK3PXP" autocomplete="off" data-i18n-ph="mSecretPh"/></div>
+        <div class="field"><label data-i18n="digitsLabel">位数</label>
+          <div class="dd" data-dd="mDigits"><button class="dd-btn" type="button"><span>6 位</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="6" class="sel">6 位</button><button type="button" data-val="7">7 位</button><button type="button" data-val="8">8 位</button></div></div>
+        </div>
+        <div class="field"><label data-i18n="stepLabel">步长</label>
+          <div class="dd" data-dd="mStep"><button class="dd-btn" type="button"><span>30 秒</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="30" class="sel">30 秒</button><button type="button" data-val="60">60 秒</button></div></div>
+        </div>
+        <div class="field"><label data-i18n="algoLabel">算法</label>
+          <div class="dd" data-dd="mAlgo"><button class="dd-btn" type="button"><span>SHA-1</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+            <div class="dd-menu"><button type="button" data-val="SHA-1" class="sel">SHA-1</button><button type="button" data-val="SHA-256">SHA-256</button><button type="button" data-val="SHA-512">SHA-512</button></div></div>
+        </div>
+        <div class="btn-row"><button class="btn-primary" id="mSave" data-i18n="saveAccount">保存账号</button></div>
+        <div class="err-text" id="mMsg"></div>
+      </div>
+    </div>
+
+    <!-- EDIT -->
+    <div class="view" id="view-edit">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="editTitle">编辑账号</h2></div>
+      <div class="field"><label for="eName" data-i18n="eName">名称</label><input type="text" id="eName"/></div>
+      <div class="field"><label for="eAcct" data-i18n="mAcct">账号</label><input type="text" id="eAcct"/></div>
+      <div class="field"><label for="eSecret" data-i18n="mSecret">密钥（Base32）</label><input type="text" id="eSecret" autocomplete="off"/></div>
+      <div class="field"><label for="eSite" data-i18n="eSite">匹配网站（域名，可留空）</label><input type="text" id="eSite" placeholder="例如 github.com" data-i18n-ph="eSitePh"/></div>
+      <div class="field"><label data-i18n="digitsLabel">位数</label>
+        <div class="dd" data-dd="eDigits"><button class="dd-btn" type="button"><span>6 位</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="dd-menu"><button type="button" data-val="6" class="sel">6 位</button><button type="button" data-val="7">7 位</button><button type="button" data-val="8">8 位</button></div></div>
+      </div>
+      <div class="field"><label data-i18n="stepLabel">步长</label>
+        <div class="dd" data-dd="eStep"><button class="dd-btn" type="button"><span>30 秒</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="dd-menu"><button type="button" data-val="30" class="sel">30 秒</button><button type="button" data-val="60">60 秒</button></div></div>
+      </div>
+      <div class="field"><label data-i18n="algoLabel">算法</label>
+        <div class="dd" data-dd="eAlgo"><button class="dd-btn" type="button"><span>SHA-1</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="dd-menu"><button type="button" data-val="SHA-1" class="sel">SHA-1</button><button type="button" data-val="SHA-256">SHA-256</button><button type="button" data-val="SHA-512">SHA-512</button></div></div>
+      </div>
+      <div class="btn-row"><button class="btn-primary" id="eSave" data-i18n="save">保存</button><button class="btn-danger-soft" id="eDelete" data-i18n="deleteAccount">删除账号</button></div>
+      <div class="err-text" id="eMsg"></div>
+    </div>
+
+    <!-- QR -->
+    <div class="view" id="view-qr">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 id="qrTitle">二维码</h2></div>
+      <div class="qr-box"><canvas id="qrCanvas" width="196" height="196"></canvas></div>
+      <p class="desc" style="text-align:center" id="qrCaption"></p>
+      <div class="uri-box" id="qrUri" style="margin-top:10px"></div>
+      <div class="btn-row" style="margin-top:10px;justify-content:center">
+        <button class="btn-soft" id="qrPrev" data-i18n="prev">上一个</button>
+        <button class="btn-soft" id="copyUri" data-i18n="copyLink">复制 otpauth 链接</button>
+        <button class="btn-soft" id="qrNext" data-i18n="next">下一个</button>
+      </div>
+    </div>
+
+    <!-- EXPORT PASSWORD -->
+    <div class="view" id="view-exportpwd">
+      <div class="detail-head"><button class="back-btn" data-back aria-label="返回" data-i18n-aria="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m15 6-6 6 6 6"/></svg></button><h2 data-i18n="expTitle">设置备份密码</h2></div>
+      <p class="desc" style="margin:6px 0 12px" data-i18n="expDesc">备份文件将用此密码加密（AES-GCM）。导入时需要输入同一密码。</p>
+      <div class="field"><label for="expPwd" data-i18n="backupPwd">备份密码</label><input type="password" id="expPwd" placeholder="至少 4 位" autocomplete="new-password" data-i18n-ph="atLeast4"/></div>
+      <div class="btn-row"><button class="btn-primary" id="expGo" data-i18n="expGo">加密并导出</button></div>
+      <div class="err-text" id="expMsg"></div>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <nav class="p-nav" id="pNav">
+    <button data-nav="codes" class="active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 12h.01M12 12h.01M17 12h.01"/></svg><span data-i18n="navCodes">验证码</span></button>
+    <button data-nav="data"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5V18.5c0 1.7 3.6 3 8 3s8-1.3 8-3V5.5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span data-i18n="navData">数据</span></button>
+    <button data-nav="settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.14-1.4l2-1.55-2-3.46-2.36.95a7 7 0 0 0-2.42-1.4L13.7 2.6h-3.4l-.38 2.54a7 7 0 0 0-2.42 1.4l-2.36-.95-2 3.46 2 1.55A7 7 0 0 0 5 12c0 .48.05.94.14 1.4l-2 1.55 2 3.46 2.36-.95a7 7 0 0 0 2.42 1.4l.38 2.54h3.4l.38-2.54a7 7 0 0 0 2.42-1.4l2.36.95 2-3.46-2-1.55c.09-.46.14-.92.14-1.4Z"/></svg><span data-i18n="navSettings">设置</span></button>
+  </nav>
+
+  <!-- lock screen -->
+  <div class="lock-screen" id="lockScreen">
+    <svg width="46" height="46" viewBox="-4 -4 56 56" aria-hidden="true"><defs><linearGradient id="lgLock" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D2F52"/><stop offset="1" stop-color="#0B1526"/></linearGradient></defs><circle cx="24" cy="24" r="19.6" fill="url(#lgLock)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#DADCE0" stroke-width="3.8"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#EA4335" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-1.30" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#4285F4" stroke-width="3.8" stroke-dasharray="12.47 135.09" stroke-dashoffset="-68.84" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#FBBC05" stroke-width="3.8" stroke-dasharray="31.17 135.09" stroke-dashoffset="-35.07" transform="rotate(-90 24 24)"/><circle cx="24" cy="24" r="21.5" fill="none" stroke="#34A853" stroke-width="3.8" stroke-dasharray="0 135.09" stroke-dashoffset="-102.61" transform="rotate(-90 24 24)"/><path d="M24 14.8 31.8 17.4 V23.1 C31.8 28.3 28.8 31.6 24 33.6 C19.2 31.6 16.2 28.3 16.2 23.1 V17.4 Z" fill="#FFFFFF"/><circle cx="24" cy="22.4" r="2.8" fill="#0E1B30"/><path d="M23 24.2h2l.7 4.8h-3.4Z" fill="#0E1B30"/></svg>
+    <h2 data-i18n="locked">已锁定</h2>
+    <p id="lockHint">输入界面密码解锁，或使用 Passkey。</p>
+    <div class="field" id="lockPwdField"><label for="lockPwd" data-i18n="pwdName">界面密码</label><input type="password" id="lockPwd" placeholder="输入界面密码" autocomplete="current-password" data-i18n-ph="lockPwdPh"/></div>
+    <div class="btn-row" style="width:100%">
+      <button class="btn-primary" id="unlockBtn" style="flex:1" data-i18n="unlock">解锁</button>
+      <button class="btn-soft" id="passkeyBtn" style="flex:1">Passkey</button>
+    </div>
+    <div class="lock-err" id="lockErr"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="qrcode.min.js"></script>
+<script src="jsQR.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
