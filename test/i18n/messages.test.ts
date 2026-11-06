@@ -22,6 +22,8 @@ const MANIFEST_LOCALE_BY_LANGUAGE: Record<string, string> = {
   fr: 'fr',
   de: 'de',
   zh: 'zh_CN',
+  'zh-TW': 'zh_TW',
+  ko: 'ko',
   tr: 'tr'
 };
 const BROWSER_BRAND_PATTERN = /\b(?:Chrome|Chromium|Edge|Firefox|Web Store)\b/i;

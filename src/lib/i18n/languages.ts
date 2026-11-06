@@ -10,6 +10,8 @@ export const LANGUAGES = [
   { code: 'fr', label: 'Français' },
   { code: 'de', label: 'Deutsch' },
   { code: 'zh', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'ko', label: '한국어' },
   { code: 'tr', label: 'Türkçe' }
 ] as const;
 
@@ -49,7 +51,9 @@ export function resolveSupportedLanguage(locales: readonly unknown[]): LanguageC
     if (typeof locale !== 'string') {
       continue;
     }
-    const language = locale.trim().toLowerCase().split(/[-_]/, 1)[0];
+    const normalized = locale.trim().toLowerCase().replaceAll('_', '-');
+    if (/^zh-(?:tw|hk|hant)(?:-|$)/.test(normalized)) return 'zh-TW';
+    const language = normalized.split('-', 1)[0];
     if (isSupportedLanguage(language)) {
       return language;
     }

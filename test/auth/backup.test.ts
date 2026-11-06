@@ -77,7 +77,7 @@ describe('encrypted backup import', () => {
 
 describe('encrypted backup export', () => {
   test('round-trips accounts through an encrypted backup file', async () => {
-    const account = createAccount({ issuer: 'Example', label: 'alice@example.com', secret: 'JBSWY3DPEHPK3PXP' });
+    const account = createAccount({ issuer: 'Example', label: 'alice@example.com', secret: 'JBSWY3DPEHPK3PXP', favorite: true, site: 'example.com' });
     const file = await createEncryptedBackupFile(
       [account],
       validVaultData.settings,
@@ -88,7 +88,7 @@ describe('encrypted backup export', () => {
     expect(file.filename).toBe('authenticator-2fa-backup-2026-08-09.json');
     const result = await importEncryptedBackup(await file.blob.text(), PASSWORD);
     expect(result.imported).toBe(1);
-    expect(result.accounts[0].secret).toBe(account.secret);
+    expect(result.accounts).toEqual([account]);
   });
 
   test('names plain exports after the day they were taken', () => {

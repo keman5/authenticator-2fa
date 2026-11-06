@@ -1,0 +1,179 @@
+import { useState, type FormEvent } from 'react';
+import { useCopy, useVault } from '../../app/vault';
+import { ErrorMessage, Field, Select } from '../../shared/ui/controls';
+import { getErrorMessage, AccountChangedError } from '../../lib/auth/errors';
+import type {
+  AccountDraft,
+  AuthenticatorAccount,
+  OtpAlgorithm,
+  OtpType
+} from '../../lib/auth/types';
+
+export function AccountForm({
+  initial,
+  onSaved,
+  onDelete
+}: {
+  initial?: AuthenticatorAccount;
+  onSaved: () => void;
+  onDelete?: () => void;
+}) {
+  const vault = useVault(),
+    { ui, tr } = useCopy();
+  const [draft, setDraft] = useState<AccountDraft>(() =>
+    initial
+      ? { ...initial }
+      : {
+          issuer: '',
+          label: '',
+          secret: '',
+          site: '',
+          type: 'totp',
+          algorithm: 'SHA-1',
+          digits: 6,
+          period: 30,
+          counter: 0
+        }
+  );
+  const [error, setError] = useState(''),
+    [busy, setBusy] = useState(false);
+  const patch = (value: Partial<AccountDraft>) => {
+    setDraft((previous) => ({ ...previous, ...value }));
+    setError('');
+  };
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (initial) await vault.updateAccount(initial, draft);
+      else await vault.addAccount(draft);
+      onSaved();
+    } catch (error) {
+      setError(
+        error instanceof AccountChangedError
+          ? tr('accountChanged')
+          : getErrorMessage(error, 'Unable to complete the action.')
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form onSubmit={save}>
+      <div className="field">
+        <label htmlFor="account-issuer">{ui('mName')}</label>
+        <input
+          id="account-issuer"
+          value={draft.issuer}
+          onChange={(e) => patch({ issuer: e.target.value })}
+          autoComplete="off"
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="account-label">{ui('mAcct')}</label>
+        <input
+          id="account-label"
+          value={draft.label}
+          onChange={(e) => patch({ label: e.target.value })}
+          required
+          autoComplete="off"
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="account-secret">{ui('mSecret')}</label>
+        <input
+          id="account-secret"
+          value={draft.secret}
+          onChange={(e) => patch({ secret: e.target.value })}
+          required
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="account-site">{ui('eSite')}</label>
+        <input
+          id="account-site"
+          value={draft.site ?? ''}
+          onChange={(e) => patch({ site: e.target.value })}
+          placeholder={ui('eSitePh')}
+          autoComplete="off"
+        />
+      </div>
+      <Field label={tr('type')}>
+        <Select
+          label={tr('type')}
+          value={draft.type ?? 'totp'}
+          options={['totp', 'hotp', 'steam'].map((value) => ({
+            value,
+            label: tr(value as OtpType)
+          }))}
+          onChange={(value) => patch({ type: value as OtpType })}
+        />
+      </Field>
+      <Field label={ui('digitsLabel')}>
+        <Select
+          label={ui('digitsLabel')}
+          value={String(draft.type === 'steam' ? 5 : draft.digits)}
+          disabled={draft.type === 'steam'}
+          options={[5, 6, 7, 8, 9, 10].map((value) => ({
+            value: String(value),
+            label: String(value)
+          }))}
+          onChange={(value) => patch({ digits: Number(value) })}
+        />
+      </Field>
+      <div className="field">
+        <label htmlFor="account-period">
+          {draft.type === 'hotp' ? tr('counter') : ui('stepLabel')}
+        </label>
+        <input
+          id="account-period"
+          type="number"
+          min={draft.type === 'hotp' ? 0 : 5}
+          max={draft.type === 'hotp' ? undefined : 300}
+          value={draft.type === 'hotp' ? draft.counter : draft.period}
+          onChange={(e) =>
+            patch(
+              draft.type === 'hotp'
+                ? { counter: Number(e.target.value) }
+                : { period: Number(e.target.value) }
+            )
+          }
+          required
+          disabled={draft.type === 'steam'}
+        />
+      </div>
+      <Field label={ui('algoLabel')}>
+        <Select
+          label={ui('algoLabel')}
+          value={draft.algorithm ?? 'SHA-1'}
+          disabled={draft.type === 'steam'}
+          options={['SHA-1', 'SHA-256', 'SHA-512'].map((value) => ({
+            value,
+            label: value
+          }))}
+          onChange={(value) => patch({ algorithm: value as OtpAlgorithm })}
+        />
+      </Field>
+      <div className="btn-row">
+        <button className="btn-primary" type="submit" disabled={busy}>
+          {ui(initial ? 'save' : 'saveAccount')}
+        </button>
+        {onDelete && (
+          <button
+            className="btn-danger-soft"
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+          >
+            {ui('deleteAccount')}
+          </button>
+        )}
+      </div>
+      <ErrorMessage>{error}</ErrorMessage>
+    </form>
+  );
+}

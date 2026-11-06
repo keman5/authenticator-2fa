@@ -1,4 +1,8 @@
-import { DEFAULT_LANGUAGE, detectBrowserLanguage, resolveSupportedLanguage } from '../i18n/languages';
+import {
+  DEFAULT_LANGUAGE,
+  detectBrowserLanguage,
+  resolveSupportedLanguage
+} from '../i18n/languages';
 import type { BrowserSyncState } from './browserSync';
 
 export type OtpType = 'totp' | 'hotp' | 'steam';
@@ -20,6 +24,8 @@ export interface AuthenticatorAccount {
   period: number;
   counter: number;
   sortOrder?: number;
+  favorite?: boolean;
+  site?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +40,8 @@ export interface AccountDraft {
   period?: number;
   counter?: number;
   sortOrder?: number;
+  favorite?: boolean;
+  site?: string;
 }
 
 export interface OtpCode {
@@ -59,12 +67,16 @@ export interface VaultData {
 
 export interface AppSettings {
   language: string;
+  languageMode?: 'system' | 'manual';
   theme: ThemePreference;
   showCountdownSeconds: boolean;
   hideCodes: boolean;
   autoPasteCodes: boolean;
   accountSortMode: AccountSortMode;
   alwaysShowAllCodes: boolean;
+  autoLockMinutes?: number;
+  enhancedInputMenu?: boolean;
+  lastBackupAt?: string;
 }
 
 export interface VaultEnvelope {
@@ -96,12 +108,15 @@ export type StoredVault = VaultEnvelope | PlainVaultRecord;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   language: DEFAULT_LANGUAGE,
+  languageMode: 'system',
   theme: 'system',
   showCountdownSeconds: false,
   hideCodes: false,
   autoPasteCodes: false,
   accountSortMode: 'contextual',
-  alwaysShowAllCodes: false
+  alwaysShowAllCodes: false,
+  autoLockMinutes: 5,
+  enhancedInputMenu: false
 };
 
 export function createDefaultAppSettings(): AppSettings {
@@ -111,14 +126,28 @@ export function createDefaultAppSettings(): AppSettings {
   };
 }
 
-export function normalizeAppSettings(settings: Partial<AppSettings> | undefined): AppSettings {
+export function normalizeAppSettings(
+  settings: Partial<AppSettings> | undefined
+): AppSettings {
   return {
     ...DEFAULT_SETTINGS,
     ...settings,
-    language: resolveSupportedLanguage(settings?.language ? [settings.language] : []),
+    language:
+      settings?.languageMode === 'system'
+        ? detectBrowserLanguage()
+        : resolveSupportedLanguage(
+            settings?.language ? [settings.language] : []
+          ),
+    languageMode:
+      settings?.languageMode ?? (settings?.language ? 'manual' : 'system'),
     hideCodes: settings?.hideCodes === true,
-    accountSortMode: settings?.accountSortMode === 'manual' ? 'manual' : 'contextual',
-    alwaysShowAllCodes: settings?.alwaysShowAllCodes === true
+    accountSortMode:
+      settings?.accountSortMode === 'manual' ? 'manual' : 'contextual',
+    alwaysShowAllCodes: settings?.alwaysShowAllCodes === true,
+    autoLockMinutes: [-1, 0, 1, 5, 30].includes(settings?.autoLockMinutes ?? 5)
+      ? (settings?.autoLockMinutes ?? 5)
+      : 5,
+    enhancedInputMenu: false
   };
 }
 

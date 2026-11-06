@@ -12,7 +12,7 @@ describe('resolveSupportedLanguage', () => {
   test.each([
     [['es-MX'], 'es'],
     [['PT_br'], 'pt'],
-    [[' zh-Hant-TW '], 'zh'],
+    [[' zh-Hant-TW '], 'zh-TW'],
     [['nl-NL', 'DE-de'], 'de']
   ])('matches supported base languages from %j', (locales, expected) => {
     expect(resolveSupportedLanguage(locales)).toBe(expected);
@@ -60,4 +60,10 @@ describe('detectBrowserLanguage', () => {
 
     expect(detectBrowserLanguage()).toBe('en');
   });
+});
+
+test('retains the root interface Korean and Traditional Chinese locale choices', () => {
+  expect(resolveSupportedLanguage(['ko-KR'])).toBe('ko');
+  expect(resolveSupportedLanguage(['zh-TW'])).toBe('zh-TW');
+  expect(resolveSupportedLanguage(['zh-Hant-HK'])).toBe('zh-TW');
 });

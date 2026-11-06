@@ -15,6 +15,7 @@ interface NameProfile {
 }
 
 interface PageIdentity {
+  hostname: string;
   siteKey: string;
   exactSiteKeys: Set<string>;
   aliases: Set<string>;
@@ -199,6 +200,10 @@ export function getAccountPageMatchScore(
 }
 
 function scoreAccount(account: AuthenticatorAccount, page: PageIdentity): number {
+  if (account.site) {
+    const domain = account.site.trim().toLowerCase().replace(/\.$/, '');
+    return page.hostname === domain || page.hostname.endsWith(`.${domain}`) ? 200 : 0;
+  }
   const issuer = createNameProfile(account.issuer);
   const issuerIsGeneric = GENERIC_ISSUERS.has([...issuer.whole][0] ?? '');
   const label = createNameProfile(
@@ -294,6 +299,7 @@ function getPageIdentity(context: PageContext | null): PageIdentity | null {
   const title = normalizeWords(context.title ?? '');
 
   return {
+    hostname,
     siteKey,
     exactSiteKeys: new Set(
       aliases.size === 0

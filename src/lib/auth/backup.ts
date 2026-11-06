@@ -1,14 +1,24 @@
-import { createVaultEnvelope, unlockVaultEnvelope, VAULT_PARAMETERS_ERROR } from './vaultCrypto';
+import {
+  createVaultEnvelope,
+  unlockVaultEnvelope,
+  VAULT_PARAMETERS_ERROR
+} from './vaultCrypto';
 import { exportOtpAuthText } from './otpauth';
 import { importAnyText } from './importText';
 import { normalizeImportedAccounts } from './otp';
-import type { AppSettings, AuthenticatorAccount, ImportResult, VaultEnvelope } from './types';
+import type {
+  AppSettings,
+  AuthenticatorAccount,
+  ImportResult,
+  VaultEnvelope
+} from './types';
 
 export { importAnyText };
 
 const BACKUP_APP = '2fa-authenticator';
 const BACKUP_VERSION = 1;
-const UNSUPPORTED_BACKUP_ERROR = 'Backup file is not a supported encrypted authenticator backup.';
+const UNSUPPORTED_BACKUP_ERROR =
+  'Backup file is not a supported encrypted authenticator backup.';
 
 export interface PortableBackup {
   app: typeof BACKUP_APP;
@@ -36,7 +46,9 @@ export function createPlainOtpAuthFile(
   exportedAt = new Date()
 ): BackupFile {
   return {
-    blob: new Blob([exportOtpAuthText(accounts)], { type: 'text/plain;charset=utf-8' }),
+    blob: new Blob([exportOtpAuthText(accounts)], {
+      type: 'text/plain;charset=utf-8'
+    }),
     filename: getBackupFileName('otpauth', 'txt', exportedAt)
   };
 }
@@ -47,7 +59,10 @@ export async function createEncryptedBackupFile(
   password: string,
   exportedAt = new Date()
 ): Promise<BackupFile> {
-  const { envelope } = await createVaultEnvelope({ accounts, settings }, password);
+  const { envelope } = await createVaultEnvelope(
+    { accounts, settings },
+    password
+  );
   const backup: PortableBackup = {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
@@ -56,7 +71,9 @@ export async function createEncryptedBackupFile(
   };
 
   return {
-    blob: new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' }),
+    blob: new Blob([JSON.stringify(backup, null, 2)], {
+      type: 'application/json;charset=utf-8'
+    }),
     filename: getBackupFileName('backup', 'json', exportedAt)
   };
 }
@@ -74,6 +91,7 @@ export function readPortableBackup(text: string): VaultEnvelope | null {
   const isPortableBackup =
     typeof backup === 'object' &&
     backup !== null &&
+    !('format' in backup) &&
     backup.app === BACKUP_APP &&
     backup.version === BACKUP_VERSION &&
     typeof backup.vault === 'object' &&
@@ -126,7 +144,11 @@ export function downloadFile({ blob, filename }: BackupFile): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function getBackupFileName(kind: string, extension: string, date: Date): string {
+function getBackupFileName(
+  kind: string,
+  extension: string,
+  date: Date
+): string {
   const stamp = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
     .map((part, index) => String(part).padStart(index === 0 ? 4 : 2, '0'))
     .join('-');

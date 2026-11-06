@@ -11,7 +11,7 @@ import {
 } from '../../src/lib/auth/vaultCrypto';
 import { importTextIntoStoredVault } from '../../src/lib/auth/vaultImport';
 import { isEncryptedVaultRecord, isPlainVaultRecord } from '../../src/lib/auth/vaultRecords';
-import { AuthenticatorVault } from '../../src/lib/state/authenticator.svelte';
+import { AuthenticatorVault } from '../../src/lib/state/authenticator';
 import { installMemoryStorage, installStructuredCloneChromeStorage } from '../helpers/storage';
 
 const ALICE_URI = otpAuthUri('alice@example.com');

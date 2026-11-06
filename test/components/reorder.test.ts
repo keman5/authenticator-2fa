@@ -4,7 +4,7 @@ import {
   isReorderCurrent,
   moveItem,
   rubberbandOffset
-} from '../../src/lib/components/auth/reorder';
+} from '../../src/features/accounts/reorder';
 
 describe('account reorder motion', () => {
   test('keeps refreshed drag positions only when the same accounts remain in the same order', () => {

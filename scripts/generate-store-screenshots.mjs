@@ -365,8 +365,8 @@ function renderDemoPage(scenario) {
       }
 
       iframe {
-        width: 400px;
-        height: ${scenario.frameHeight ?? 532}px;
+        width: 380px;
+        height: ${scenario.frameHeight ?? 600}px;
         border: 0;
         border-radius: 20px;
         background: white;
@@ -408,7 +408,7 @@ function renderDemoPage(scenario) {
 
       const frame = document.getElementById('app-frame');
       frame.addEventListener('load', async () => {
-        applyFrameHeight(${scenario.frameHeight ?? 532});
+        applyFrameHeight(${scenario.frameHeight ?? 600});
         await delay(700);
         await runScenario(${JSON.stringify(scenario.action)});
       });
@@ -421,9 +421,7 @@ function renderDemoPage(scenario) {
         } else if (action === 'settings') {
           clickSelector(doc, '[aria-label="Settings"]');
         } else if (action === 'import-export') {
-          clickSelector(doc, '[aria-label="Settings"]');
-          await delay(350);
-          clickByText(doc, 'button', 'Import/export');
+          clickByText(doc, 'nav button', 'Data');
         }
       }
 
@@ -444,7 +442,7 @@ function renderDemoPage(scenario) {
       function applyFrameHeight(height) {
         const doc = frame.contentDocument;
         const style = doc.createElement('style');
-        style.textContent = ':root{--auth-popup-height:' + height + 'px;}html,body,#app{height:' + height + 'px!important;min-height:' + height + 'px!important;max-height:' + height + 'px!important;}';
+        style.textContent = ':root{--auth-popup-height:' + height + 'px;}html,body,#app,.pui{height:' + height + 'px!important;min-height:' + height + 'px!important;max-height:' + height + 'px!important;}';
         doc.head.append(style);
       }
 

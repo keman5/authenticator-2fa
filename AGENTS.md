@@ -4,7 +4,7 @@ Guidance for code agents working on Authenticator - 2FA.
 
 ## Project Context
 
-- This is a browser extension built with Svelte 5, TypeScript, Vite, Tailwind CSS, and daisyUI.
+- This is a browser extension built with React 19, TypeScript, Vite, Tailwind CSS, and daisyUI.
 - Product name: `Authenticator - 2FA`.
 - Extension `short_name`: must stay within the package limit of 12 characters per locale.
 - Homepage metadata: `https://github.com/VastBlast/authenticator-2fa`.
@@ -38,7 +38,7 @@ Guidance for code agents working on Authenticator - 2FA.
 
 ## Localization
 
-- Runtime translations live in `src/lib/i18n/messages.ts`.
+- Runtime vault translations live in `src/lib/i18n/messages.ts`; the approved popup labels live in `src/lib/i18n/interface.json`. React components subscribe through `useCopy()`.
 - Manifest translations live in `assets/extension/_locales/*/messages.json`.
 - Every supported runtime language should have every `MessageKey`.
 - Keep `appName` as `Authenticator - 2FA`. Keep manifest short names search-relevant and within the 12-character package limit.
@@ -46,7 +46,7 @@ Guidance for code agents working on Authenticator - 2FA.
 ## Storage And Serialization
 
 - The vault starts unprotected by default; password protection is optional.
-- Do not pass Svelte state proxies into extension storage or crypto serialization.
+- Do not pass framework state or listener metadata into extension storage or crypto serialization.
 - Persist plain structured-clone-safe objects.
 - Keep tests that exercise structured-clone storage behavior.
 

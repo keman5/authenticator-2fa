@@ -10,7 +10,7 @@ import {
   isEncryptedVaultRecord,
   isPlainVaultRecord
 } from '../../src/lib/auth/vaultRecords';
-import { AuthenticatorVault } from '../../src/lib/state/authenticator.svelte';
+import { AuthenticatorVault } from '../../src/lib/state/authenticator';
 import * as vaultCrypto from '../../src/lib/auth/vaultCrypto';
 import { installMemoryStorage, installStructuredCloneChromeStorage } from '../helpers/storage';
 
@@ -274,7 +274,7 @@ describe('AuthenticatorVault persistence and locking', () => {
     await saveStoredVault(
       createPlainVaultRecord({
         accounts: [],
-        settings: { ...DEFAULT_SETTINGS, language: 'de-DE' }
+        settings: { ...DEFAULT_SETTINGS, language: 'de-DE', languageMode: 'manual' }
       })
     );
 
@@ -333,12 +333,15 @@ describe('AuthenticatorVault persistence and locking', () => {
     expect(vault.hasVault).toBe(false);
     expect(vault.settings).toEqual({
       language: 'en',
+      languageMode: 'system',
       theme: 'system',
       showCountdownSeconds: false,
       hideCodes: false,
       autoPasteCodes: false,
       accountSortMode: 'contextual',
-      alwaysShowAllCodes: false
+      alwaysShowAllCodes: false,
+      autoLockMinutes: 5,
+      enhancedInputMenu: false
     });
     expect(await loadStoredVault()).toBeNull();
   });

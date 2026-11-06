@@ -3,7 +3,7 @@ import {
   getSyncStatusKey,
   getSyncStatusTone,
   SYNC_STATUS_DOT
-} from '../../src/lib/components/auth/syncStatus';
+} from '../../src/features/sync/status';
 
 describe('sync status presentation', () => {
   test('maps every status to a message key', () => {

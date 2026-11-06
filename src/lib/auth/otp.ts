@@ -26,8 +26,8 @@ export function accountFingerprint(account: AuthenticatorAccount): string {
 export function createAccount(draft: AccountDraft): AuthenticatorAccount {
   const now = new Date().toISOString();
   const type = draft.type ?? 'totp';
-  const digits = type === 'steam' ? 5 : draft.digits ?? 6;
-  const period = type === 'hotp' ? 30 : draft.period ?? 30;
+  const digits = type === 'steam' ? 5 : (draft.digits ?? 6);
+  const period = type === 'hotp' ? 30 : (draft.period ?? 30);
 
   validateAccountDraft({ ...draft, type, digits, period });
 
@@ -42,6 +42,12 @@ export function createAccount(draft: AccountDraft): AuthenticatorAccount {
     period,
     counter: Math.max(0, Math.trunc(draft.counter ?? 0)),
     sortOrder: draft.sortOrder,
+    ...(draft.favorite !== undefined
+      ? { favorite: draft.favorite === true }
+      : {}),
+    ...(draft.site !== undefined
+      ? { site: draft.site.trim().toLowerCase() }
+      : {}),
     createdAt: now,
     updatedAt: now
   };
@@ -56,12 +62,21 @@ export function updateAccount(
     ...account,
     issuer: patch.issuer === undefined ? account.issuer : patch.issuer.trim(),
     label: patch.label === undefined ? account.label : patch.label.trim(),
-    secret: patch.secret === undefined ? account.secret : normalizeBase32(patch.secret),
+    secret:
+      patch.secret === undefined
+        ? account.secret
+        : normalizeBase32(patch.secret),
     type,
     algorithm: patch.algorithm ?? account.algorithm,
-    digits: type === 'steam' ? 5 : patch.digits ?? account.digits,
+    digits: type === 'steam' ? 5 : (patch.digits ?? account.digits),
     period: patch.period ?? account.period,
     counter: Math.max(0, Math.trunc(patch.counter ?? account.counter)),
+    ...(patch.favorite !== undefined
+      ? { favorite: patch.favorite === true }
+      : {}),
+    ...(patch.site !== undefined
+      ? { site: patch.site.trim().toLowerCase() }
+      : {}),
     updatedAt: new Date().toISOString()
   };
 
@@ -83,13 +98,16 @@ export function validateAccountDraft(draft: AccountDraft): void {
     throw new Error('Unsupported OTP type.');
   }
 
-  const digits = type === 'steam' ? 5 : draft.digits ?? 6;
+  const digits = type === 'steam' ? 5 : (draft.digits ?? 6);
   if (!Number.isInteger(digits) || digits < 5 || digits > 10) {
     throw new Error('Digits must be between 5 and 10.');
   }
 
   const period = draft.period ?? 30;
-  if (type !== 'hotp' && (!Number.isInteger(period) || period < 5 || period > 300)) {
+  if (
+    type !== 'hotp' &&
+    (!Number.isInteger(period) || period < 5 || period > 300)
+  ) {
     throw new Error('Period must be between 5 and 300 seconds.');
   }
 
@@ -99,7 +117,9 @@ export function validateAccountDraft(draft: AccountDraft): void {
   }
 }
 
-export function normalizeImportedAccounts(accounts: unknown): AuthenticatorAccount[] {
+export function normalizeImportedAccounts(
+  accounts: unknown
+): AuthenticatorAccount[] {
   if (!Array.isArray(accounts)) {
     throw new Error('Imported account list is not valid.');
   }
@@ -113,7 +133,10 @@ function normalizeImportedAccount(value: unknown): AuthenticatorAccount {
   }
 
   const record = value as Record<string, unknown>;
-  if (typeof record.type !== 'string' || !(OTP_TYPES as readonly string[]).includes(record.type)) {
+  if (
+    typeof record.type !== 'string' ||
+    !(OTP_TYPES as readonly string[]).includes(record.type)
+  ) {
     throw new Error(IMPORTED_ACCOUNT_ERROR);
   }
   if (
@@ -148,6 +171,10 @@ function normalizeImportedAccount(value: unknown): AuthenticatorAccount {
     account.sortOrder = sortOrder;
   }
 
+  if (typeof record.favorite === 'boolean') account.favorite = record.favorite;
+  if (typeof record.site === 'string')
+    account.site = record.site.trim().toLowerCase();
+
   validateAccountDraft(account);
   if (account.period < 5 || account.period > 300) {
     throw new Error(IMPORTED_ACCOUNT_ERROR);
@@ -161,19 +188,26 @@ export async function generateOtpCode(
   now = Date.now()
 ): Promise<OtpCode> {
   const counter =
-    account.type === 'hotp' ? account.counter : Math.floor(Math.floor(now / 1000) / account.period);
+    account.type === 'hotp'
+      ? account.counter
+      : Math.floor(Math.floor(now / 1000) / account.period);
   const value =
     account.type === 'steam'
       ? await generateSteamCode(account.secret, counter)
       : await hotp(account.secret, counter, account.digits, account.algorithm);
   const remaining =
-    account.type === 'hotp' ? 0 : account.period - (Math.floor(now / 1000) % account.period);
+    account.type === 'hotp'
+      ? 0
+      : account.period - (Math.floor(now / 1000) % account.period);
 
   return {
     accountId: account.id,
     value,
     remaining,
-    progress: account.type === 'hotp' ? 100 : ((account.period - remaining) / account.period) * 100
+    progress:
+      account.type === 'hotp'
+        ? 100
+        : ((account.period - remaining) / account.period) * 100
   };
 }
 
@@ -195,7 +229,9 @@ export async function hotp(
   view.setUint32(0, Math.floor(counter / 0x100000000));
   view.setUint32(4, counter >>> 0);
 
-  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, counterBytes));
+  const signature = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, counterBytes)
+  );
   const offset = signature[signature.length - 1] & 0x0f;
   const binary =
     ((signature[offset] & 0x7f) << 24) |
@@ -207,7 +243,10 @@ export async function hotp(
   return String(binary % modulus).padStart(digits, '0');
 }
 
-export async function generateSteamCode(secret: string, counter: number): Promise<string> {
+export async function generateSteamCode(
+  secret: string,
+  counter: number
+): Promise<string> {
   const numeric = Number(await hotp(secret, counter, 10, 'SHA-1'));
   let code = '';
   let value = numeric;
@@ -221,7 +260,10 @@ export async function generateSteamCode(secret: string, counter: number): Promis
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength
+  ) as ArrayBuffer;
 }
 
 function readNonEmptyString(value: unknown): string {

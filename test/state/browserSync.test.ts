@@ -4,7 +4,7 @@ import { createEncryptedBackupFile } from '../../src/lib/auth/backup';
 import { loadStoredVault } from '../../src/lib/auth/storage';
 import { unlockVaultEnvelope } from '../../src/lib/auth/vaultCrypto';
 import { isEncryptedVaultRecord } from '../../src/lib/auth/vaultRecords';
-import { AuthenticatorVault } from '../../src/lib/state/authenticator.svelte';
+import { AuthenticatorVault } from '../../src/lib/state/authenticator';
 import { importTextIntoStoredVault } from '../../src/lib/auth/vaultImport';
 import { createAccount } from '../../src/lib/auth/otp';
 import { createBrowserSyncNetwork, type BrowserSyncDevice } from '../helpers/browserSync';

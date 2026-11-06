@@ -1,4 +1,6 @@
-import { authenticatorVault } from '../state/authenticator.svelte';
+import interfaceMessages from './interface.json';
+import { interfaceToVaultKey } from './interfaceMap';
+import { authenticatorVault } from '../state/authenticator';
 
 export const MESSAGE_KEYS = [
   'appName',
@@ -66,6 +68,14 @@ export const MESSAGE_KEYS = [
   'importDropHint',
   'importChooseFiles',
   'opensInNewWindow',
+  'cameraAccessFailed',
+  'cameraAccessBlocked',
+  'cameraNotFound',
+  'cameraStartFailed',
+  'cameraPlaybackFailed',
+  'cameraDecodeFailed',
+  'cameraErrorDetails',
+  'cameraOpensInWindow',
   'importing',
   'importEncryptedPrompt',
   'importAddedCount',
@@ -282,6 +292,14 @@ const en: Record<MessageKey, string> = {
   importDropHint: 'QR images, otpauth text, JSON, or an encrypted backup',
   importChooseFiles: 'Choose files',
   opensInNewWindow: 'Opens in a new window',
+  cameraAccessFailed: "Could not access the camera. Retry or upload a QR image; open the details for the browser's reason.",
+  cameraAccessBlocked: "Camera access is blocked by the browser or system. Check camera permissions, then retry or upload a QR image.",
+  cameraNotFound: "No camera is available. Connect or enable a camera, then retry or upload a QR image.",
+  cameraStartFailed: "The camera could not start. Close other camera apps or tabs and retry. If it persists, restart the browser or upload a QR image.",
+  cameraPlaybackFailed: "Camera connected, but the video preview could not play. Retry or upload a QR image.",
+  cameraDecodeFailed: "The camera is connected, but QR scanning failed. Retry or upload a QR image.",
+  cameraErrorDetails: "Error details",
+  cameraOpensInWindow: 'Camera access continues in a new browser window.',
   importing: 'Importing…',
   importEncryptedPrompt: 'This backup is password protected.',
   importAddedCount: 'Codes added: {count}',
@@ -453,6 +471,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'Imágenes QR, texto otpauth, JSON o un respaldo cifrado',
     importChooseFiles: 'Elegir archivos',
     opensInNewWindow: 'Se abre en una ventana nueva',
+    cameraAccessFailed: "No se pudo acceder a la cámara. Reinténtalo o sube una imagen QR; consulta los detalles del navegador.",
+    cameraAccessBlocked: "El navegador o el sistema bloquean la cámara. Revisa los permisos y reinténtalo o sube una imagen QR.",
+    cameraNotFound: "No hay una cámara disponible. Conecta o activa una y reinténtalo o sube una imagen QR.",
+    cameraStartFailed: "La cámara no pudo iniciarse. Cierra otras aplicaciones o pestañas que la usen y reinténtalo. Si persiste, reinicia el navegador o sube una imagen QR.",
+    cameraPlaybackFailed: "La cámara se conectó, pero la vista previa no pudo reproducirse. Reinténtalo o sube una imagen QR.",
+    cameraDecodeFailed: "La cámara está conectada, pero falló la lectura QR. Reinténtalo o sube una imagen QR.",
+    cameraErrorDetails: "Detalles del error",
+    cameraOpensInWindow: 'El acceso a la cámara continúa en una ventana nueva del navegador.',
     importing: 'Importando…',
     importEncryptedPrompt: 'Este respaldo está protegido con contraseña.',
     importAddedCount: 'Códigos añadidos: {count}',
@@ -622,6 +648,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR छवियाँ, otpauth टेक्स्ट, JSON या एन्क्रिप्टेड बैकअप',
     importChooseFiles: 'फ़ाइलें चुनें',
     opensInNewWindow: 'नई विंडो में खुलता है',
+    cameraAccessFailed: "कैमरे का उपयोग नहीं हो सका। दोबारा कोशिश करें या QR चित्र अपलोड करें; कारण के लिए विवरण देखें।",
+    cameraAccessBlocked: "ब्राउज़र या सिस्टम ने कैमरे की पहुँच रोकी है। कैमरा अनुमतियाँ जाँचें और फिर कोशिश करें या QR चित्र अपलोड करें।",
+    cameraNotFound: "कोई कैमरा उपलब्ध नहीं है। कैमरा जोड़ें या चालू करें, फिर कोशिश करें या QR चित्र अपलोड करें।",
+    cameraStartFailed: "कैमरा शुरू नहीं हो सका। कैमरा उपयोग करने वाले अन्य ऐप या टैब बंद करके फिर कोशिश करें। समस्या बनी रहे तो ब्राउज़र पुनः शुरू करें या QR चित्र अपलोड करें।",
+    cameraPlaybackFailed: "कैमरा जुड़ गया, लेकिन वीडियो पूर्वावलोकन नहीं चला। फिर कोशिश करें या QR चित्र अपलोड करें।",
+    cameraDecodeFailed: "कैमरा जुड़ा है, लेकिन QR स्कैन नहीं हो सका। फिर कोशिश करें या QR चित्र अपलोड करें।",
+    cameraErrorDetails: "त्रुटि विवरण",
+    cameraOpensInWindow: 'कैमरे का उपयोग नई ब्राउज़र विंडो में जारी रहेगा।',
     importing: 'आयात हो रहा है…',
     importEncryptedPrompt: 'यह बैकअप पासवर्ड से सुरक्षित है।',
     importAddedCount: 'जोड़े गए कोड: {count}',
@@ -790,6 +824,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'صور QR أو نص otpauth أو JSON أو نسخة احتياطية مشفرة',
     importChooseFiles: 'اختر الملفات',
     opensInNewWindow: 'يُفتح في نافذة جديدة',
+    cameraAccessFailed: "تعذّر الوصول إلى الكاميرا. أعد المحاولة أو ارفع صورة QR؛ افتح التفاصيل لمعرفة سبب المتصفح.",
+    cameraAccessBlocked: "المتصفح أو النظام يحظر الوصول إلى الكاميرا. تحقق من الأذونات ثم أعد المحاولة أو ارفع صورة QR.",
+    cameraNotFound: "لا توجد كاميرا متاحة. صِل كاميرا أو فعّلها ثم أعد المحاولة أو ارفع صورة QR.",
+    cameraStartFailed: "تعذّر بدء الكاميرا. أغلق التطبيقات أو علامات التبويب الأخرى التي تستخدمها ثم أعد المحاولة. إن استمرت المشكلة، أعد تشغيل المتصفح أو ارفع صورة QR.",
+    cameraPlaybackFailed: "اتصلت الكاميرا لكن تعذّر تشغيل معاينة الفيديو. أعد المحاولة أو ارفع صورة QR.",
+    cameraDecodeFailed: "الكاميرا متصلة لكن فشل مسح QR. أعد المحاولة أو ارفع صورة QR.",
+    cameraErrorDetails: "تفاصيل الخطأ",
+    cameraOpensInWindow: 'يستمر استخدام الكاميرا في نافذة متصفح جديدة.',
     importing: 'جارٍ الاستيراد…',
     importEncryptedPrompt: 'هذه النسخة الاحتياطية محمية بكلمة مرور.',
     importAddedCount: 'الرموز المضافة: {count}',
@@ -958,6 +1000,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR ছবি, otpauth টেক্সট, JSON বা এনক্রিপ্টেড ব্যাকআপ',
     importChooseFiles: 'ফাইল বেছে নিন',
     opensInNewWindow: 'নতুন উইন্ডোতে খোলে',
+    cameraAccessFailed: "ক্যামেরা ব্যবহার করা যায়নি। আবার চেষ্টা করুন বা QR ছবি আপলোড করুন; ব্রাউজারের কারণ দেখতে বিস্তারিত খুলুন।",
+    cameraAccessBlocked: "ব্রাউজার বা সিস্টেম ক্যামেরার ব্যবহার আটকে দিয়েছে। ক্যামেরার অনুমতি যাচাই করে আবার চেষ্টা করুন বা QR ছবি আপলোড করুন।",
+    cameraNotFound: "কোনো ক্যামেরা পাওয়া যায়নি। ক্যামেরা সংযুক্ত বা চালু করে আবার চেষ্টা করুন বা QR ছবি আপলোড করুন।",
+    cameraStartFailed: "ক্যামেরা চালু হয়নি। ক্যামেরা ব্যবহার করা অন্য অ্যাপ বা ট্যাব বন্ধ করে আবার চেষ্টা করুন। সমস্যা থাকলে ব্রাউজার পুনরায় চালু করুন বা QR ছবি আপলোড করুন।",
+    cameraPlaybackFailed: "ক্যামেরা সংযুক্ত হয়েছে, কিন্তু ভিডিও প্রিভিউ চালু হয়নি। আবার চেষ্টা করুন বা QR ছবি আপলোড করুন।",
+    cameraDecodeFailed: "ক্যামেরা সংযুক্ত আছে, কিন্তু QR স্ক্যান ব্যর্থ হয়েছে। আবার চেষ্টা করুন বা QR ছবি আপলোড করুন।",
+    cameraErrorDetails: "ত্রুটির বিস্তারিত",
+    cameraOpensInWindow: 'ক্যামেরা ব্যবহার নতুন ব্রাউজার উইন্ডোতে চালু হবে।',
     importing: 'ইমপোর্ট হচ্ছে…',
     importEncryptedPrompt: 'এই ব্যাকআপ পাসওয়ার্ড দিয়ে সুরক্ষিত।',
     importAddedCount: 'যোগ হওয়া কোড: {count}',
@@ -1126,6 +1176,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'Imagens QR, texto otpauth, JSON ou um backup criptografado',
     importChooseFiles: 'Escolher arquivos',
     opensInNewWindow: 'Abre em uma nova janela',
+    cameraAccessFailed: "Não foi possível acessar a câmera. Tente novamente ou envie uma imagem QR; abra os detalhes para ver o motivo do navegador.",
+    cameraAccessBlocked: "O navegador ou sistema bloqueou a câmera. Verifique as permissões e tente novamente ou envie uma imagem QR.",
+    cameraNotFound: "Nenhuma câmera está disponível. Conecte ou ative uma câmera e tente novamente ou envie uma imagem QR.",
+    cameraStartFailed: "A câmera não iniciou. Feche outros aplicativos ou abas que a utilizam e tente novamente. Se persistir, reinicie o navegador ou envie uma imagem QR.",
+    cameraPlaybackFailed: "A câmera conectou, mas a prévia do vídeo não iniciou. Tente novamente ou envie uma imagem QR.",
+    cameraDecodeFailed: "A câmera está conectada, mas a leitura QR falhou. Tente novamente ou envie uma imagem QR.",
+    cameraErrorDetails: "Detalhes do erro",
+    cameraOpensInWindow: 'O acesso à câmera continua em uma nova janela do navegador.',
     importing: 'Importando…',
     importEncryptedPrompt: 'Este backup está protegido por senha.',
     importAddedCount: 'Códigos adicionados: {count}',
@@ -1295,6 +1353,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR-изображения, текст otpauth, JSON или зашифрованная резервная копия',
     importChooseFiles: 'Выбрать файлы',
     opensInNewWindow: 'Откроется в новом окне',
+    cameraAccessFailed: "Не удалось получить доступ к камере. Повторите попытку или загрузите QR-изображение; причина браузера указана в подробностях.",
+    cameraAccessBlocked: "Браузер или система блокирует камеру. Проверьте разрешения и повторите попытку или загрузите QR-изображение.",
+    cameraNotFound: "Камера недоступна. Подключите или включите камеру и повторите попытку или загрузите QR-изображение.",
+    cameraStartFailed: "Камера не запустилась. Закройте другие приложения или вкладки, использующие её, и повторите попытку. Если проблема сохраняется, перезапустите браузер или загрузите QR-изображение.",
+    cameraPlaybackFailed: "Камера подключена, но предпросмотр видео не запустился. Повторите попытку или загрузите QR-изображение.",
+    cameraDecodeFailed: "Камера подключена, но сканирование QR не удалось. Повторите попытку или загрузите QR-изображение.",
+    cameraErrorDetails: "Подробности ошибки",
+    cameraOpensInWindow: 'Доступ к камере продолжится в новом окне браузера.',
     importing: 'Импорт…',
     importEncryptedPrompt: 'Эта резервная копия защищена паролем.',
     importAddedCount: 'Добавлено кодов: {count}',
@@ -1464,6 +1530,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR画像、otpauthテキスト、JSON、暗号化バックアップ',
     importChooseFiles: 'ファイルを選択',
     opensInNewWindow: '新しいウィンドウで開きます',
+    cameraAccessFailed: "カメラにアクセスできませんでした。再試行するかQR画像をアップロードしてください。ブラウザーの理由は詳細で確認できます。",
+    cameraAccessBlocked: "ブラウザーまたはシステムがカメラをブロックしています。カメラ権限を確認して再試行するか、QR画像をアップロードしてください。",
+    cameraNotFound: "利用できるカメラがありません。接続または有効化して再試行するか、QR画像をアップロードしてください。",
+    cameraStartFailed: "カメラを起動できませんでした。カメラを使う他のアプリやタブを閉じて再試行してください。続く場合はブラウザーを再起動するか、QR画像をアップロードしてください。",
+    cameraPlaybackFailed: "カメラに接続しましたが、映像を再生できませんでした。再試行するかQR画像をアップロードしてください。",
+    cameraDecodeFailed: "カメラは接続されていますが、QR読み取りに失敗しました。再試行するかQR画像をアップロードしてください。",
+    cameraErrorDetails: "エラーの詳細",
+    cameraOpensInWindow: 'カメラの操作は新しいブラウザーウィンドウで続けます。',
     importing: 'インポート中…',
     importEncryptedPrompt: 'このバックアップはパスワードで保護されています。',
     importAddedCount: '追加したコード: {count}',
@@ -1631,6 +1705,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'Images QR, texte otpauth, JSON ou une sauvegarde chiffrée',
     importChooseFiles: 'Choisir des fichiers',
     opensInNewWindow: 'S’ouvre dans une nouvelle fenêtre',
+    cameraAccessFailed: "Impossible d’accéder à la caméra. Réessayez ou importez une image QR ; les détails indiquent la raison du navigateur.",
+    cameraAccessBlocked: "Le navigateur ou le système bloque la caméra. Vérifiez les autorisations puis réessayez ou importez une image QR.",
+    cameraNotFound: "Aucune caméra disponible. Connectez ou activez une caméra puis réessayez ou importez une image QR.",
+    cameraStartFailed: "La caméra n’a pas démarré. Fermez les autres applications ou onglets qui l’utilisent et réessayez. Si le problème persiste, redémarrez le navigateur ou importez une image QR.",
+    cameraPlaybackFailed: "La caméra est connectée mais l’aperçu vidéo n’a pas pu démarrer. Réessayez ou importez une image QR.",
+    cameraDecodeFailed: "La caméra est connectée mais la lecture QR a échoué. Réessayez ou importez une image QR.",
+    cameraErrorDetails: "Détails de l’erreur",
+    cameraOpensInWindow: 'L’accès à la caméra continue dans une nouvelle fenêtre du navigateur.',
     importing: 'Importation…',
     importEncryptedPrompt: 'Cette sauvegarde est protégée par un mot de passe.',
     importAddedCount: 'Codes ajoutés : {count}',
@@ -1800,6 +1882,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR-Bilder, otpauth-Text, JSON oder eine verschlüsselte Sicherung',
     importChooseFiles: 'Dateien auswählen',
     opensInNewWindow: 'Öffnet sich in einem neuen Fenster',
+    cameraAccessFailed: "Kein Kamerazugriff möglich. Versuche es erneut oder lade ein QR-Bild hoch; der Browsergrund steht in den Details.",
+    cameraAccessBlocked: "Browser oder System blockiert die Kamera. Prüfe die Kameraberechtigungen und versuche es erneut oder lade ein QR-Bild hoch.",
+    cameraNotFound: "Keine Kamera verfügbar. Verbinde oder aktiviere eine Kamera und versuche es erneut oder lade ein QR-Bild hoch.",
+    cameraStartFailed: "Die Kamera konnte nicht starten. Schließe andere Kamera-Apps oder Tabs und versuche es erneut. Starte bei weiteren Problemen den Browser neu oder lade ein QR-Bild hoch.",
+    cameraPlaybackFailed: "Kamera verbunden, aber die Videovorschau konnte nicht starten. Versuche es erneut oder lade ein QR-Bild hoch.",
+    cameraDecodeFailed: "Die Kamera ist verbunden, aber der QR-Scan ist fehlgeschlagen. Versuche es erneut oder lade ein QR-Bild hoch.",
+    cameraErrorDetails: "Fehlerdetails",
+    cameraOpensInWindow: 'Der Kamerazugriff wird in einem neuen Browserfenster fortgesetzt.',
     importing: 'Importieren…',
     importEncryptedPrompt: 'Diese Sicherung ist mit einem Passwort geschützt.',
     importAddedCount: 'Hinzugefügte Codes: {count}',
@@ -1969,6 +2059,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'QR 图片、otpauth 文本、JSON 或加密备份',
     importChooseFiles: '选择文件',
     opensInNewWindow: '在新窗口中打开',
+    cameraAccessFailed: "无法访问摄像头。请重试或上传二维码图片；展开错误详情可查看浏览器返回的原因。",
+    cameraAccessBlocked: "浏览器或系统阻止了摄像头访问。请检查摄像头权限，然后重试或上传二维码图片。",
+    cameraNotFound: "没有可用的摄像头。请连接或启用摄像头，然后重试或上传二维码图片。",
+    cameraStartFailed: "摄像头未能启动。请关闭其他使用摄像头的应用或标签页后重试；如仍失败，请重启浏览器或上传二维码图片。",
+    cameraPlaybackFailed: "摄像头已连接，但视频预览未能播放。请重试或上传二维码图片。",
+    cameraDecodeFailed: "摄像头已连接，但二维码识别失败。请重试或上传二维码图片。",
+    cameraErrorDetails: "错误详情",
+    cameraOpensInWindow: '将在新的浏览器窗口中继续使用摄像头。',
     importing: '正在导入…',
     importEncryptedPrompt: '此备份已使用密码保护。',
     importAddedCount: '已添加代码：{count}',
@@ -2134,6 +2232,14 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
     importDropHint: 'Karekod görüntüleri, otpauth metni, JSON veya şifreli yedek',
     importChooseFiles: 'Dosya seç',
     opensInNewWindow: 'Yeni bir pencerede açılır',
+    cameraAccessFailed: "Kameraya erişilemedi. Yeniden deneyin veya QR görüntüsü yükleyin; tarayıcının nedenini ayrıntılarda görebilirsiniz.",
+    cameraAccessBlocked: "Tarayıcı veya sistem kamerayı engelliyor. Kamera izinlerini kontrol edip yeniden deneyin veya QR görüntüsü yükleyin.",
+    cameraNotFound: "Kullanılabilir kamera yok. Kamera bağlayın veya etkinleştirin ve yeniden deneyin ya da QR görüntüsü yükleyin.",
+    cameraStartFailed: "Kamera başlatılamadı. Kamerayı kullanan diğer uygulama veya sekmeleri kapatıp yeniden deneyin. Sorun sürerse tarayıcıyı yeniden başlatın veya QR görüntüsü yükleyin.",
+    cameraPlaybackFailed: "Kamera bağlandı ancak video önizlemesi oynatılamadı. Yeniden deneyin veya QR görüntüsü yükleyin.",
+    cameraDecodeFailed: "Kamera bağlı ancak QR taraması başarısız oldu. Yeniden deneyin veya QR görüntüsü yükleyin.",
+    cameraErrorDetails: "Hata ayrıntıları",
+    cameraOpensInWindow: 'Kamera erişimi yeni bir tarayıcı penceresinde devam eder.',
     importing: 'İçe aktarılıyor…',
     importEncryptedPrompt: 'Bu yedek parolayla korunuyor.',
     importAddedCount: 'Eklenen kodlar: {count}',
@@ -2191,6 +2297,44 @@ const dictionaries: Record<string, Record<MessageKey, string>> = {
   }
 };
 
+// Preserve the two additional languages from the approved root interface. All
+// vault keys are populated, including the existing sync/security vocabulary.
+for (const locale of ['zh-TW', 'ko'] as const) {
+  const labels = interfaceMessages[locale];
+  const translated = { ...(locale === 'zh-TW' ? dictionaries.zh : en) };
+  const populated = new Set<string>();
+  for (const [interfaceKey, vaultKey] of Object.entries(interfaceToVaultKey)) {
+    const value = labels[interfaceKey as keyof typeof labels];
+    if (value && !populated.has(vaultKey)) { translated[vaultKey as MessageKey] = value; populated.add(vaultKey); }
+  }
+  translated.cameraAccessFailed = locale === 'zh-TW'
+    ? "無法存取相機。請重試或上傳 QR 碼圖片；展開錯誤詳情可查看瀏覽器回傳的原因。"
+    : "카메라에 접근할 수 없습니다. 다시 시도하거나 QR 이미지를 업로드하세요. 자세한 정보에서 브라우저의 원인을 확인할 수 있습니다.";
+  translated.cameraAccessBlocked = locale === 'zh-TW'
+    ? "瀏覽器或系統封鎖了相機存取。請檢查相機權限，然後重試或上傳 QR 碼圖片。"
+    : "브라우저 또는 시스템이 카메라 접근을 차단했습니다. 카메라 권한을 확인한 후 다시 시도하거나 QR 이미지를 업로드하세요.";
+  translated.cameraNotFound = locale === 'zh-TW'
+    ? "沒有可用的相機。請連接或啟用相機，然後重試或上傳 QR 碼圖片。"
+    : "사용 가능한 카메라가 없습니다. 카메라를 연결하거나 활성화한 후 다시 시도하거나 QR 이미지를 업로드하세요.";
+  translated.cameraStartFailed = locale === 'zh-TW'
+    ? "相機未能啟動。請關閉其他使用相機的應用程式或分頁後重試；如仍失敗，請重新啟動瀏覽器或上傳 QR 碼圖片。"
+    : "카메라를 시작하지 못했습니다. 카메라를 사용하는 다른 앱이나 탭을 닫고 다시 시도하세요. 계속 실패하면 브라우저를 재시작하거나 QR 이미지를 업로드하세요.";
+  translated.cameraPlaybackFailed = locale === 'zh-TW'
+    ? "相機已連接，但視訊預覽未能播放。請重試或上傳 QR 碼圖片。"
+    : "카메라는 연결되었지만 영상 미리보기를 재생하지 못했습니다. 다시 시도하거나 QR 이미지를 업로드하세요.";
+  translated.cameraDecodeFailed = locale === 'zh-TW'
+    ? '相機已連接，但 QR 碼辨識失敗。請重試或上傳 QR 碼圖片。'
+    : '카메라는 연결되었지만 QR 인식에 실패했습니다. 다시 시도하거나 QR 이미지를 업로드하세요.';
+  translated.cameraErrorDetails = locale === 'zh-TW'
+    ? "錯誤詳情"
+    : "오류 세부 정보";
+  translated.cameraOpensInWindow = locale === 'zh-TW'
+    ? '將在新的瀏覽器視窗中繼續使用相機。'
+    : '새 브라우저 창에서 카메라 사용을 계속합니다.';
+  translated.appName = 'Authenticator - 2FA';
+  dictionaries[locale] = translated;
+}
+
 /** Values substituted into `{placeholder}` slots of a message. */
 export type MessageValues = Record<string, string | number>;
 
@@ -2204,10 +2348,8 @@ export function t(language: string, key: MessageKey, values?: MessageValues): st
 }
 
 /**
- * Reactive translation helper bound to the active vault language.
- * Reading `vault.settings.language` inside a component's reactive context
- * makes every `tr(...)` call re-evaluate when the language changes, so
- * components don't need to thread a `tr` prop around.
+ * Translation helper for non-React domain feedback. React views use useCopy(),
+ * which subscribes to the selected vault and updates on language changes.
  */
 export function tr(key: MessageKey, values?: MessageValues): string {
   return t(authenticatorVault.settings.language, key, values);

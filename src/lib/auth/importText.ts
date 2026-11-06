@@ -1,6 +1,6 @@
 import { normalizeImportedAccounts } from './otp';
 import { parseImportText } from './otpauth';
-import type { ImportResult, VaultData } from './types';
+import type { ImportResult } from './types';
 
 export function importAnyText(text: string): ImportResult {
   const trimmed = text.trim();
@@ -9,9 +9,15 @@ export function importAnyText(text: string): ImportResult {
   }
 
   if (trimmed.startsWith('{')) {
-    const raw = JSON.parse(trimmed) as Partial<VaultData> | Record<string, unknown>;
-    if (Array.isArray((raw as Partial<VaultData>).accounts)) {
-      const accounts = normalizeImportedAccounts((raw as Partial<VaultData>).accounts);
+    const raw = JSON.parse(trimmed) as Record<string, unknown>;
+    if (
+      'format' in raw ||
+      ('app' in raw && (raw.app !== '2fa-authenticator' || raw.version !== 1))
+    ) {
+      throw new Error('Backup file format is not supported.');
+    }
+    if (Array.isArray(raw.accounts)) {
+      const accounts = normalizeImportedAccounts(raw.accounts);
       return { accounts, imported: accounts.length, skipped: 0, errors: [] };
     }
   }
