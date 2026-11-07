@@ -329,7 +329,12 @@ function Application() {
     <div className="pui" id="popup" data-theme={theme}>
       <header className="p-head" inert={vault.locked || undefined}>
         <div className="brand-logo" role="img" aria-label={ui('brandAria')}>
-          <Logo />
+          <Logo
+            countdown={
+              !vault.locked &&
+              vault.accounts.some((account) => account.type !== 'hotp')
+            }
+          />
         </div>
         <div className={`search ${query ? 'has-text' : ''}`}>
           <Search size={14} />

@@ -111,8 +111,8 @@ export async function encryptVaultData(
 }
 
 async function deriveKey(password: string, salt: Uint8Array, iterations = KDF_ITERATIONS): Promise<CryptoKey> {
-  if (password.length < 8) {
-    throw new Error('Vault password must be at least 8 characters.');
+  if (password.length < 1) {
+    throw new Error('Vault password must be at least 1 character.');
   }
 
   const baseKey = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [

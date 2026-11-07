@@ -47,6 +47,7 @@ export function Password({
         <input
           id={id}
           type={shown ? 'text' : 'password'}
+          minLength={1}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
@@ -127,6 +128,36 @@ export function Switch({
     </div>
   );
 }
+export function Segmented({
+  label,
+  value,
+  options,
+  onChange,
+  disabled
+}: {
+  label: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="seg join" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          className={`join-item ${option.value === value ? 'active' : ''}`}
+          type="button"
+          key={option.value}
+          aria-pressed={option.value === value}
+          disabled={disabled}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 export function Select({
   label,
   value,
@@ -162,7 +193,22 @@ export function Select({
         setOpen(false);
       }
     };
-    const scroll = () => setOpen(false);
+    const scroll = () => {
+      const box = buttonRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const width = Math.min(window.innerWidth - 12, Math.max(170, box.width));
+      setPosition({
+        top: Math.max(
+          6,
+          Math.min(
+            box.bottom + 5,
+            window.innerHeight - Math.min(280, options.length * 34 + 10)
+          )
+        ),
+        left: Math.max(6, Math.min(box.left, window.innerWidth - width - 6)),
+        width
+      });
+    };
     document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', key, true);
     window.addEventListener('resize', scroll);
@@ -173,7 +219,7 @@ export function Select({
       window.removeEventListener('resize', scroll);
       document.querySelector('.p-body')?.removeEventListener('scroll', scroll);
     };
-  }, [open]);
+  }, [open, options.length]);
   return (
     <div className="dd" ref={ref}>
       <button
@@ -385,18 +431,27 @@ export function FilePicker({
     </>
   );
 }
-export function Logo({ size = 30 }: { size?: number }) {
+export function Logo({
+  size = 30,
+  countdown = false
+}: {
+  size?: number;
+  countdown?: boolean;
+}) {
   const id = useId();
   const [remaining, setRemaining] = useState(
     () => 30 - (Math.floor(Date.now() / 1000) % 30)
   );
   useEffect(() => {
+    if (!countdown) return;
+    setRemaining(30 - (Math.floor(Date.now() / 1000) % 30));
     const timer = setInterval(
       () => setRemaining(30 - (Math.floor(Date.now() / 1000) % 30)),
       1000
     );
     return () => clearInterval(timer);
-  }, []);
+  }, [countdown]);
+  const seconds = countdown ? remaining : 30;
   return (
     <svg width={size} height={size} viewBox="-4 -4 56 56" aria-hidden="true">
       <defs>
@@ -421,9 +476,9 @@ export function Logo({ size = 30 }: { size?: number }) {
           cy="24"
           r="21.5"
           fill="none"
-          stroke={remaining <= 5 ? '#EA4335' : color}
+          stroke={seconds <= 5 ? '#EA4335' : color}
           strokeWidth="3.8"
-          strokeDasharray={`${(31.17 * Math.max(0, Math.min(1, (remaining / 30) * 4 - index))).toFixed(2)} 135.09`}
+          strokeDasharray={`${(31.17 * Math.max(0, Math.min(1, (seconds / 30) * 4 - index))).toFixed(2)} 135.09`}
           strokeDashoffset={-1.3 - 33.77 * index}
           transform="rotate(-90 24 24)"
         />

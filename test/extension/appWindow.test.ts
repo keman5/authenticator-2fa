@@ -137,8 +137,7 @@ describe('openAppWindow', () => {
 
     const [data] = create.mock.calls[0]!;
     expect(data.type).toBe('popup');
-    // The 400×532 popup layout cannot shrink, and the window frame needs room too.
-    expect(data.width).toBeGreaterThanOrEqual(420);
+    expect(data.width).toBe(370);
     expect(data.height).toBeGreaterThanOrEqual(600);
     expect(popup.close).toHaveBeenCalledOnce();
 
@@ -226,9 +225,9 @@ test('camera handoff positions a taller normal window beside its source within t
   await openAppWindow('add-qr', 'browser-window');
   expect(get.mock.calls[0]![0]).toBe(7);
   expect(create.mock.calls[0]![0]).toMatchObject({
-    left: 1112,
-    top: 80,
-    width: 440,
+    left: 730,
+    top: 165,
+    width: 370,
     height: 800,
     type: 'normal'
   });
@@ -237,7 +236,7 @@ test('camera handoff positions a taller normal window beside its source within t
   ).toBe('1');
 });
 
-test('normal camera positioning accounts for the minimum width imposed by the browser', async () => {
+test('Firefox camera window aligns right with an 85px vertical offset and 370px width', async () => {
   const popup = installWindow('moz-extension://abcdefghijklmnop/index.html');
   popup.screen = {
     availLeft: 0,
@@ -259,9 +258,41 @@ test('normal camera positioning accounts for the minimum width imposed by the br
   });
   await openAppWindow('add-qr', 'browser-window');
   expect(create.mock.calls[0]![0]).toMatchObject({
-    left: 1300,
-    top: 80,
-    width: 500,
+    left: 1430,
+    top: 165,
+    width: 370,
     height: 800
   });
 });
+
+test.each(['import', 'add-qr'] as const)(
+  'file handoff for %s uses the browser right edge plus 85px',
+  async (route) => {
+    const popup = installWindow();
+    popup.screen = {
+      availLeft: 0,
+      availTop: 0,
+      availWidth: 1920,
+      availHeight: 1080
+    };
+    const create = vi.fn(
+      (_data: chrome.windows.CreateData, callback: () => void) => callback()
+    );
+    installChrome({
+      windows: {
+        create,
+        getCurrent: (callback: (data: unknown) => void) => callback({ id: 7 }),
+        get: (_id: number, callback: (data: unknown) => void) =>
+          callback({ left: 100, top: 80, width: 1000 })
+      }
+    });
+    await openAppWindow(route);
+    expect(create.mock.calls[0]![0]).toMatchObject({
+      left: 730,
+      top: 165,
+      width: 370,
+      height: 680,
+      type: 'popup'
+    });
+  }
+);

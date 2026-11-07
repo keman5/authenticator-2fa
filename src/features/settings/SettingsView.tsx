@@ -222,7 +222,7 @@ export function SettingsView({
         </div>
         <a
           className="list-row"
-          href="https://github.com/VastBlast/authenticator-2fa"
+          href="https://github.com/keman5/authenticator-2fa"
           target="_blank"
           rel="noreferrer"
         >
@@ -295,7 +295,7 @@ export function PasswordView({ onBack }: { onBack: () => void }) {
           <button
             className="btn-primary"
             type="submit"
-            disabled={vault.busy || password.length < 8}
+            disabled={vault.busy || password.length < 1}
           >
             {ui('savePwd')}
           </button>
@@ -389,7 +389,7 @@ export function PasskeyView({
         </div>
       </div>
       {!vault.passwordProtected && (
-        <div className="btn-row">
+        <div className="btn-row" style={{ marginTop: 16 }}>
           <button className="btn-primary" type="button" onClick={onProtect}>
             {tr('setPassword')}
           </button>

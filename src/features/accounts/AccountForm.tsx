@@ -1,6 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useCopy, useVault } from '../../app/vault';
-import { ErrorMessage, Field, Select } from '../../shared/ui/controls';
+import {
+  ErrorMessage,
+  Field,
+  Select,
+  Segmented
+} from '../../shared/ui/controls';
 import { getErrorMessage, AccountChangedError } from '../../lib/auth/errors';
 import type {
   AccountDraft,
@@ -65,6 +70,7 @@ export function AccountForm({
       <div className="field">
         <label htmlFor="account-issuer">{ui('mName')}</label>
         <input
+          type="text"
           id="account-issuer"
           value={draft.issuer}
           onChange={(e) => patch({ issuer: e.target.value })}
@@ -74,6 +80,7 @@ export function AccountForm({
       <div className="field">
         <label htmlFor="account-label">{ui('mAcct')}</label>
         <input
+          type="text"
           id="account-label"
           value={draft.label}
           onChange={(e) => patch({ label: e.target.value })}
@@ -84,6 +91,7 @@ export function AccountForm({
       <div className="field">
         <label htmlFor="account-secret">{ui('mSecret')}</label>
         <input
+          type="text"
           id="account-secret"
           value={draft.secret}
           onChange={(e) => patch({ secret: e.target.value })}
@@ -95,6 +103,7 @@ export function AccountForm({
       <div className="field">
         <label htmlFor="account-site">{ui('eSite')}</label>
         <input
+          type="text"
           id="account-site"
           value={draft.site ?? ''}
           onChange={(e) => patch({ site: e.target.value })}
@@ -103,7 +112,7 @@ export function AccountForm({
         />
       </div>
       <Field label={tr('type')}>
-        <Select
+        <Segmented
           label={tr('type')}
           value={draft.type ?? 'totp'}
           options={['totp', 'hotp', 'steam'].map((value) => ({
@@ -147,7 +156,7 @@ export function AccountForm({
         />
       </div>
       <Field label={ui('algoLabel')}>
-        <Select
+        <Segmented
           label={ui('algoLabel')}
           value={draft.algorithm ?? 'SHA-1'}
           disabled={draft.type === 'steam'}

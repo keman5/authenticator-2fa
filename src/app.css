@@ -471,12 +471,16 @@
 .pui .p-nav {
   flex: none;
   height: 38px;
+  min-height: 38px;
+  max-height: 38px;
   border-top: 1px solid var(--line);
   display: flex;
   background: var(--bg);
 }
 .pui .p-nav button {
   flex: 1;
+  min-height: 0;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -510,6 +514,7 @@
 }
 .pui .field input[type='text'],
 .pui .field input[type='password'],
+.pui .field input[type='number'],
 .pui .field textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -1013,7 +1018,7 @@
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  background: #0b1526;
+  background: var(--panel2);
   aspect-ratio: 4/3;
   display: grid;
   place-items: center;
@@ -1026,7 +1031,7 @@
   object-fit: cover;
 }
 .pui .cam-placeholder {
-  color: #8ab4f8;
+  color: var(--blue);
   font-size: 12px;
   text-align: center;
   line-height: 1.7;
@@ -1041,7 +1046,7 @@
   position: absolute;
   width: 22px;
   height: 22px;
-  border: 3px solid #8ab4f8;
+  border: 3px solid var(--blue);
 }
 .pui .scan-corners i:nth-child(1) {
   left: 0;
@@ -1296,7 +1301,7 @@ html.toolbar-popup .pui {
 .pui {
   width: 100%;
   min-width: 0;
-  max-width: 720px;
+  max-width: 370px;
   height: min(600px, 100dvh);
   margin: auto;
 }

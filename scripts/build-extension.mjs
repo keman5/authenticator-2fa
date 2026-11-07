@@ -21,7 +21,7 @@ function createManifest(target) {
     version: packageJson.version,
     description: '__MSG_extensionDescription__',
     default_locale: 'en',
-    homepage_url: 'https://github.com/VastBlast/authenticator-2fa',
+    homepage_url: 'https://github.com/keman5/authenticator-2fa',
     icons: {
       16: 'icons/icon16.png',
       32: 'icons/icon32.png',
@@ -67,7 +67,7 @@ function createManifest(target) {
   if (target === 'firefox') {
     manifest.browser_specific_settings = {
       gecko: {
-        id: 'authenticator@example.local',
+        id: 'authenticator-2fa@macseek.cc',
         strict_min_version: '126.0',
         data_collection_permissions: {
           required: ['none'],

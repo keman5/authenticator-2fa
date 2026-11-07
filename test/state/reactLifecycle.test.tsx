@@ -92,6 +92,7 @@ test('a camera permission result arriving after navigation releases every acquir
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   view.unmount();
   await act(async () => {
@@ -240,9 +241,11 @@ test('camera startup in a toolbar popup opens a normal browser window without re
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   expect(
     screen.getByText('Camera access continues in a new browser window.')
   ).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   await waitFor(() => expect(create).toHaveBeenCalledOnce());
   expect(getUserMedia).not.toHaveBeenCalled();
@@ -276,6 +279,7 @@ test('camera rejection gives localized recovery guidance without claiming the us
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: '摄像头扫码' }));
   fireEvent.click(screen.getByRole('button', { name: '开启摄像头' }));
   const error = await screen.findByRole('alert');
   expect(error.textContent).toContain('摄像头权限');
@@ -299,6 +303,7 @@ test('camera hardware startup failure retains the access stage and browser diagn
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   const error = await screen.findByRole('alert');
   expect(error.textContent).toContain('Close other camera apps');
@@ -327,6 +332,7 @@ test('video playback rejection reports playback rather than camera permissions a
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   const error = await screen.findByRole('alert');
   expect(error.textContent).toContain('Camera connected');
@@ -358,6 +364,7 @@ test('playback resolving after a scan-mode change cannot reactivate the stopped 
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   await waitFor(() => expect(play).toHaveBeenCalled());
   fireEvent.click(screen.getByRole('button', { name: 'Screenshot' }));
@@ -399,6 +406,7 @@ test('a frame read failure reports the QR decode stage and stops the camera', as
       <Scanner onImported={() => {}} onPageScan={async () => {}} />
     </VaultProvider>
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Camera scan' }));
   fireEvent.click(screen.getByRole('button', { name: 'Turn on camera' }));
   const error = await screen.findByRole('alert');
   expect(error.textContent).toContain('QR scanning failed');

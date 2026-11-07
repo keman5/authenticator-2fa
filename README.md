@@ -35,7 +35,7 @@ pnpm run preview             # 预览已构建的 Web 入口
 | Edge | 打开 `edge://extensions`，开启开发者模式，加载已解压的 `dist/edge` |
 | Firefox | 打开 `about:debugging#/runtime/this-firefox`，选择“临时载入附加组件”，载入 `dist/firefox/manifest.json` |
 
-Firefox 临时附加组件在退出浏览器后移除；长期安装需要按浏览器要求签名。当前没有 Safari 构建目标。Firefox 标识保持 `authenticator@example.local`，现有扩展身份、权限、侧边栏与快捷键配置均沿用原构建。重新加载同一已安装扩展可沿用其存储；换浏览器、配置文件或扩展 ID 前请先导出备份。
+Firefox 临时附加组件在退出浏览器后移除；长期安装需要按浏览器要求签名。当前没有 Safari 构建目标。Firefox 标识改为 `authenticator-2fa@macseek.cc`；更换 ID 后会被视为新的扩展，不能自动读取旧 ID 的数据。重新加载同一已安装扩展可沿用其存储；换浏览器、配置文件或扩展 ID 前请先导出备份。
 
 工具栏快捷键为 `Command/Ctrl + Shift + 2`，也可在浏览器扩展快捷键设置中修改。支持的文件选择场景会自动转到独立扩展窗口，避免弹窗关闭后丢失导入任务。
 

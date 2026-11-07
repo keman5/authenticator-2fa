@@ -8,8 +8,7 @@ export type AppRoute = (typeof APP_ROUTES)[number];
 const ROUTE_PARAM = 'open';
 const PAGE_WINDOW_PARAM = 'window';
 const CAMERA_WINDOW_PARAM = 'camera';
-// Outer size, so the 400×532 popup layout fits alongside the window frame.
-const APP_WINDOW_SIZE = { width: 440, height: 680 } as const;
+const APP_WINDOW_SIZE = { width: 370, height: 680 } as const;
 const OPEN_WINDOW_FAILED = 'Could not open a new window.';
 
 /** User-Agent Client Hints, which only Chromium-based browsers provide. */
@@ -85,10 +84,10 @@ export async function openAppWindow(
     url.searchParams.set(PAGE_WINDOW_PARAM, String(pageWindowId));
   }
 
-  const bounds =
+  const bounds = await appWindowOptions(
+    pageWindowId,
     surface === 'browser-window'
-      ? await cameraWindowOptions(pageWindowId)
-      : APP_WINDOW_SIZE;
+  );
 
   await new Promise<void>((resolve, reject) => {
     const settle = () => {
@@ -117,16 +116,16 @@ export async function openAppWindow(
   window.close();
 }
 
-async function cameraWindowOptions(
-  windowId: number | undefined
+async function appWindowOptions(
+  windowId: number | undefined,
+  camera: boolean
 ): Promise<Partial<chrome.windows.CreateData>> {
-  // Firefox enforces this minimum for normal windows; use it when placing too.
-  const width =
-    new URL(window.location.href).protocol === 'moz-extension:' ? 500 : 440;
+  const width = APP_WINDOW_SIZE.width;
+  const height = camera ? 800 : APP_WINDOW_SIZE.height;
   const available = window.screen as
     (Screen & { availLeft?: number; availTop?: number }) | undefined;
   if (!available || available.availWidth <= 0 || available.availHeight <= 0)
-    return { width, height: 800 };
+    return { width, height };
   const area: WorkArea = {
     left: available.availLeft ?? 0,
     top: available.availTop ?? 0,
@@ -144,7 +143,7 @@ async function cameraWindowOptions(
       else resolve(undefined);
     }
   );
-  return cameraWindowBounds(source, area, width);
+  return cameraWindowBounds(source, area, width, 85, height);
 }
 
 function isToolbarPopup(): boolean {

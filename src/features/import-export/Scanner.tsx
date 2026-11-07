@@ -12,6 +12,8 @@ import {
   type CameraStage
 } from '../../lib/auth/camera';
 import {
+  isCameraWindow,
+  readAppRoute,
   needsCameraWindow,
   openAppWindow
 } from '../../lib/extension/appWindow';
@@ -25,7 +27,13 @@ export function Scanner({
 }) {
   const vault = useVault(),
     { ui, tr } = useCopy();
-  const [mode, setMode] = useState<'shot' | 'upload' | 'cam'>('cam'),
+  const [mode, setMode] = useState<'shot' | 'upload' | 'cam'>(() =>
+      isCameraWindow(location.href)
+        ? 'cam'
+        : readAppRoute(location.href) === 'add-qr'
+          ? 'upload'
+          : 'shot'
+    ),
     [error, setError] = useState(''),
     [cameraFailure, setCameraFailure] = useState<CameraFailure | null>(null),
     [busy, setBusy] = useState(false),

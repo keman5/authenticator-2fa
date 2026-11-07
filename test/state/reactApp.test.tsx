@@ -210,3 +210,61 @@ test.each(['delete confirmation', 'drag preview'] as const)(
     ).toBeTruthy();
   }
 );
+
+test('header logo counts down only while time-based accounts exist', async () => {
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(new Date('2026-11-07T00:00:10Z').getTime());
+  try {
+    const vault = await openApp();
+    const ring = () =>
+      Array.from(
+        document.querySelectorAll('.brand-logo circle[stroke-dasharray]')
+      ).map((circle) => circle.getAttribute('stroke-dasharray'));
+    const complete = Array(4).fill('31.17 135.09');
+    expect(ring()).toEqual(complete);
+    await act(() =>
+      vault.importText(
+        'otpauth://totp/Example:alice?secret=JBSWY3DPEHPK3PXP&issuer=Example'
+      )
+    );
+    await waitFor(() => expect(ring()).not.toEqual(complete));
+    await act(() => vault.deleteAccount(vault.accounts[0]));
+    expect(ring()).toEqual(complete);
+    await act(() =>
+      vault.importText(
+        'otpauth://hotp/Example:bob?secret=JBSWY3DPEHPK3PXP&issuer=Example&counter=0'
+      )
+    );
+    expect(vault.accounts).toHaveLength(1);
+    expect(ring()).toEqual(complete);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+test('default add uses screenshot and a single-character UI password survives locking', async () => {
+  const user = userEvent.setup();
+  const vault = await openApp();
+  await user.click(screen.getByRole('button', { name: 'Add account' }));
+  expect(
+    screen
+      .getByRole('button', { name: 'Screenshot' })
+      .getAttribute('aria-pressed')
+  ).toBe('true');
+  await user.click(screen.getByRole('button', { name: 'Manual entry' }));
+  expect(
+    screen.getByLabelText('Name (site or service)').getAttribute('type')
+  ).toBe('text');
+  expect(screen.getByRole('group', { name: 'Type' })).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: /UI password/ }));
+  await user.type(screen.getByLabelText('New password'), '1');
+  await user.type(screen.getByLabelText('Confirm password'), '1');
+  await user.click(screen.getByRole('button', { name: 'Save password' }));
+  await waitFor(() => expect(vault.passwordProtected).toBe(true));
+  await act(() => vault.lock());
+  await user.type(screen.getByLabelText('Password'), '1');
+  await user.click(screen.getByRole('button', { name: 'Unlock' }));
+  await waitFor(() => expect(vault.locked).toBe(false));
+});

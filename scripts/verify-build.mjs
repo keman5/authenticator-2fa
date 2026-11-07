@@ -13,7 +13,7 @@ for (const target of ['chrome', 'edge', 'firefox']) {
   assert.equal(manifest.default_locale, 'en');
   assert.equal(
     manifest.homepage_url,
-    'https://github.com/VastBlast/authenticator-2fa'
+    'https://github.com/keman5/authenticator-2fa'
   );
   assert.equal(manifest.action.default_popup, 'index.html');
   assert.deepEqual(
@@ -32,7 +32,7 @@ for (const target of ['chrome', 'edge', 'firefox']) {
   if (target === 'firefox')
     assert.equal(
       manifest.browser_specific_settings.gecko.id,
-      'authenticator@example.local'
+      'authenticator-2fa@macseek.cc'
     );
   await access(join(root, 'index.html'));
   for (const script of ['codePaster', 'pageScanner']) {
